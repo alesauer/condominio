@@ -22,8 +22,24 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
+import logging
+from fastapi.exceptions import HTTPException, RequestValidationError
+
+logger = logging.getLogger("condo.api")
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request, exc: Exception):
+    logger.error("Erro não tratado na requisição %s: %s", request.url.path, exc, exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": "Erro interno do servidor"},

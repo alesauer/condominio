@@ -38,11 +38,12 @@ async def dashboard_cards(db: AsyncSession = Depends(get_db)):
 async def receitas_mensais(ano: int = Query(None), db: AsyncSession = Depends(get_db)):
     if not ano:
         ano = date.today().year
+    col_mes = func.to_char(Receita.competencia, "YYYY-MM")
     result = await db.execute(
-        select(func.to_char(Receita.competencia, "YYYY-MM"), func.sum(Receita.valor))
+        select(col_mes, func.sum(Receita.valor))
         .where(func.extract("year", Receita.competencia) == ano, Receita.status == "pago")
-        .group_by(func.to_char(Receita.competencia, "YYYY-MM"))
-        .order_by("mes")
+        .group_by(col_mes)
+        .order_by(col_mes)
     )
     return [{"mes": r[0], "valor": float(r[1])} for r in result.all()]
 
@@ -51,10 +52,11 @@ async def receitas_mensais(ano: int = Query(None), db: AsyncSession = Depends(ge
 async def despesas_mensais(ano: int = Query(None), db: AsyncSession = Depends(get_db)):
     if not ano:
         ano = date.today().year
+    col_mes = func.to_char(Despesa.competencia, "YYYY-MM")
     result = await db.execute(
-        select(func.to_char(Despesa.competencia, "YYYY-MM"), func.sum(Despesa.valor))
+        select(col_mes, func.sum(Despesa.valor))
         .where(func.extract("year", Despesa.competencia) == ano, Despesa.status == "pago")
-        .group_by(func.to_char(Despesa.competencia, "YYYY-MM"))
-        .order_by("mes")
+        .group_by(col_mes)
+        .order_by(col_mes)
     )
     return [{"mes": r[0], "valor": float(r[1])} for r in result.all()]

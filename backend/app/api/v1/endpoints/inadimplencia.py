@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.models.cobranca import Cobranca
 from app.models.config_inadimplencia import ConfigInadimplencia
 from pydantic import BaseModel
@@ -20,7 +21,7 @@ class ConfigUpdate(BaseModel):
     dias_tolerancia: Optional[int] = None
 
 
-@router.get("/config")
+@router.get("/config", dependencies=[Depends(get_current_user)])
 async def get_config(db: AsyncSession = Depends(get_db)):
     r = await db.execute(select(ConfigInadimplencia).limit(1))
     config = r.scalar_one_or_none()

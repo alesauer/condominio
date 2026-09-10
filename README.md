@@ -38,9 +38,10 @@ docker-compose up --build
 ```
 
 Serviços:
-- **Frontend:** http://localhost:3000
-- **Backend API:** http://localhost:8000
-- **Swagger:** http://localhost:8000/docs
+- **Frontend:** http://localhost:3080
+- **Backend API:** http://localhost:8080
+- **Swagger:** http://localhost:8080/docs
+- **PostgreSQL (Host):** localhost:5435
 
 Login inicial:
 - Email: `admin@condo.com`

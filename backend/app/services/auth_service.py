@@ -1,11 +1,11 @@
-from datetime import datetime
-from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException, status
 from app.models.usuario import Usuario
 from app.models.token_refresh import TokenRefresh
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.config import settings
 
 
 async def authenticate(db: AsyncSession, email: str, password: str) -> dict:
@@ -21,10 +21,7 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> dict:
     access_token = create_access_token({"sub": str(user.id)})
     refresh_token_str = create_refresh_token({"sub": str(user.id)})
 
-    expires_at = datetime.utcnow() + TokenRefresh.__table__.c.expires_at.type.python_type.__call__() if False else None
-    from datetime import timedelta
-    from app.core.config import settings
-    expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     token_refresh = TokenRefresh(
         usuario_id=user.id,
@@ -61,7 +58,7 @@ async def refresh_access_token(db: AsyncSession, refresh_token_str: str) -> dict
     if not token_record:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token não encontrado ou revogado")
 
-    if token_record.expires_at < datetime.utcnow():
+    if token_record.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expirado")
 
     user_id = payload.get("sub")

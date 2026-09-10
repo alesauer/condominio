@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3080", "http://localhost:3000", "http://localhost:3001"]
 
     UPLOAD_DIR: str = "/app/data/uploads"
     MAX_UPLOAD_SIZE_MB: int = 20

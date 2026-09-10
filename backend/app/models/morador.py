@@ -7,8 +7,9 @@ import enum
 
 
 class TipoMorador(str, enum.Enum):
-    morador = "morador"
+    proprietario = "proprietario"
     inquilino = "inquilino"
+    morador = "morador"
     dependente = "dependente"
 
 
@@ -25,3 +26,4 @@ class Morador(Base, BaseModelMixin):
 
     usuario = relationship("Usuario")
     apartamentos = relationship("ApartamentoMorador", back_populates="morador", cascade="all, delete-orphan")
+    apartamentos_proprietario = relationship("Apartamento", back_populates="proprietario", foreign_keys="Apartamento.proprietario_id")

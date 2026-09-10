@@ -15,7 +15,11 @@ class ReceitaCreate(BaseModel):
     data_recebimento: Optional[date] = None
     status: StatusFinanceiro = StatusFinanceiro.pendente
     observacao: Optional[str] = None
+    comprovante_url: Optional[str] = None
+    comprovante_nome: Optional[str] = None
     apartamento_id: Optional[UUID] = None
+    recorrente: bool = False
+    meses_recorrencia: Optional[int] = None
 
 
 class ReceitaUpdate(BaseModel):
@@ -28,6 +32,8 @@ class ReceitaUpdate(BaseModel):
     data_recebimento: Optional[date] = None
     status: Optional[StatusFinanceiro] = None
     observacao: Optional[str] = None
+    comprovante_url: Optional[str] = None
+    comprovante_nome: Optional[str] = None
 
 
 class ReceitaResponse(BaseModel):
@@ -41,6 +47,8 @@ class ReceitaResponse(BaseModel):
     data_recebimento: Optional[date]
     status: StatusFinanceiro
     observacao: Optional[str]
+    comprovante_url: Optional[str] = None
+    comprovante_nome: Optional[str] = None
     apartamento_id: Optional[UUID]
     created_at: datetime
     updated_at: datetime

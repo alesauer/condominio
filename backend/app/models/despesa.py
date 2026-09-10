@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Numeric, Date, Text, Enum as SQLEnum, Boolean, Integer
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, selectinload
 from app.core.database import Base
 from app.models.base import BaseModelMixin
 from app.models.receita import StatusFinanceiro
@@ -23,7 +23,10 @@ class Despesa(Base, BaseModelMixin):
     data_pagamento = Column(Date, nullable=True)
     status = Column(SQLEnum(StatusFinanceiro), nullable=False, default=StatusFinanceiro.pendente, index=True)
     observacao = Column(Text, nullable=True)
+    comprovante_url = Column(String(500), nullable=True)
+    comprovante_nome = Column(String(255), nullable=True)
     parcelamento = Column(Boolean, nullable=False, default=False)
     total_parcelas = Column(Integer, nullable=True)
 
-    parcelas = relationship("DespesaParcela", back_populates="despesa", cascade="all, delete-orphan")
+    parcelas = relationship("DespesaParcela", back_populates="despesa", cascade="all, delete-orphan", lazy="selectin")
+

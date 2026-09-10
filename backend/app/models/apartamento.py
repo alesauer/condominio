@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Numeric, Enum as SQLEnum
+from sqlalchemy import Column, String, Numeric, Enum as SQLEnum, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from app.models.base import BaseModelMixin
@@ -27,8 +28,9 @@ class Apartamento(Base, BaseModelMixin):
     metragem = Column(Numeric(8, 2), nullable=True)
     vaga_demarcada = Column(String(50), nullable=True)
     status = Column(SQLEnum(StatusApartamento), nullable=False, default=StatusApartamento.vazio)
+    proprietario_id = Column(UUID(as_uuid=True), ForeignKey("moradores.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    proprietarios = relationship("ApartamentoProprietario", back_populates="apartamento", cascade="all, delete-orphan")
+    proprietario = relationship("Morador", back_populates="apartamentos_proprietario", foreign_keys=[proprietario_id])
     moradores = relationship("ApartamentoMorador", back_populates="apartamento", cascade="all, delete-orphan")
     cobrancas = relationship("Cobranca", back_populates="apartamento", cascade="all, delete-orphan")
     leituras_gas = relationship("LeituraGas", back_populates="apartamento", cascade="all, delete-orphan")

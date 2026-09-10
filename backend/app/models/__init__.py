@@ -2,7 +2,6 @@ from app.models.usuario import Usuario, RoleUsuario
 from app.models.apartamento import Apartamento, TipoApartamento, StatusApartamento
 from app.models.proprietario import Proprietario
 from app.models.morador import Morador, TipoMorador
-from app.models.apartamento_proprietario import ApartamentoProprietario
 from app.models.apartamento_morador import ApartamentoMorador
 from app.models.receita import Receita, TipoReceita, StatusFinanceiro
 from app.models.despesa import Despesa, TipoDespesa
@@ -26,7 +25,6 @@ __all__ = [
     "Apartamento", "TipoApartamento", "StatusApartamento",
     "Proprietario",
     "Morador", "TipoMorador",
-    "ApartamentoProprietario",
     "ApartamentoMorador",
     "Receita", "TipoReceita", "StatusFinanceiro",
     "Despesa", "TipoDespesa",

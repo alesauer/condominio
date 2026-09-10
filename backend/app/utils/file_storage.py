@@ -20,3 +20,14 @@ async def save_upload(file: UploadFile, subdir: str = "documentos") -> str:
 
 def get_file_path(relative_path: str) -> Path:
     return UPLOAD_DIR / relative_path
+
+
+def delete_file(relative_path: str) -> bool:
+    try:
+        path = get_file_path(relative_path)
+        if path.exists() and path.is_file():
+            path.unlink()
+            return True
+    except Exception:
+        pass
+    return False

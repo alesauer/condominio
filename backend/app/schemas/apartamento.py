@@ -1,8 +1,18 @@
-from datetime import datetime, date
-from typing import Optional, List
+from datetime import datetime
+from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from app.models.apartamento import TipoApartamento, StatusApartamento
+
+
+class ProprietarioResumo(BaseModel):
+    id: UUID
+    nome: str
+    telefone: Optional[str] = None
+    email: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class ApartamentoCreate(BaseModel):
@@ -13,6 +23,14 @@ class ApartamentoCreate(BaseModel):
     metragem: Optional[float] = None
     vaga_demarcada: Optional[str] = None
     status: StatusApartamento = StatusApartamento.vazio
+    proprietario_id: Optional[UUID] = None
+
+    @field_validator("proprietario_id", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class ApartamentoUpdate(BaseModel):
@@ -23,6 +41,14 @@ class ApartamentoUpdate(BaseModel):
     metragem: Optional[float] = None
     vaga_demarcada: Optional[str] = None
     status: Optional[StatusApartamento] = None
+    proprietario_id: Optional[UUID] = None
+
+    @field_validator("proprietario_id", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class ApartamentoResponse(BaseModel):
@@ -34,6 +60,8 @@ class ApartamentoResponse(BaseModel):
     metragem: Optional[float]
     vaga_demarcada: Optional[str]
     status: StatusApartamento
+    proprietario_id: Optional[UUID]
+    proprietario: Optional[ProprietarioResumo] = None
     created_at: datetime
     updated_at: datetime
 
@@ -47,6 +75,8 @@ class ApartamentoListResponse(BaseModel):
     bloco: Optional[str]
     tipo: TipoApartamento
     status: StatusApartamento
+    proprietario_id: Optional[UUID]
+    proprietario: Optional[ProprietarioResumo] = None
 
     class Config:
         from_attributes = True

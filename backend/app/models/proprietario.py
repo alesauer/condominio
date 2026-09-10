@@ -15,4 +15,3 @@ class Proprietario(Base, BaseModelMixin):
     usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
 
     usuario = relationship("Usuario")
-    apartamentos = relationship("ApartamentoProprietario", back_populates="proprietario", cascade="all, delete-orphan")

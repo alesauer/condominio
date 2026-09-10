@@ -6,6 +6,7 @@ export interface Receita {
   id: string; descricao: string; tipo: TipoReceita; categoria: string | null;
   valor: number; competencia: string; vencimento: string | null;
   data_recebimento: string | null; status: StatusFinanceiro; observacao: string | null;
+  comprovante_url?: string | null; comprovante_nome?: string | null;
   apartamento_id: string | null; created_at: string; updated_at: string;
 }
 
@@ -19,6 +20,7 @@ export interface Despesa {
   id: string; descricao: string; tipo: TipoDespesa; categoria: string | null;
   valor: number; competencia: string; vencimento: string | null;
   data_pagamento: string | null; status: StatusFinanceiro; observacao: string | null;
+  comprovante_url?: string | null; comprovante_nome?: string | null;
   parcelamento: boolean; total_parcelas: number | null; parcelas: DespesaParcela[];
   created_at: string; updated_at: string;
 }
@@ -30,7 +32,15 @@ export interface Cobranca {
   created_at: string; updated_at: string;
 }
 
-export type ReceitaCreate = Omit<Receita, "id" | "created_at" | "updated_at">;
-export type DespesaCreate = Omit<Despesa, "id" | "created_at" | "updated_at" | "parcelas"> & { total_parcelas?: number };
+export type ReceitaCreate = Omit<Receita, "id" | "created_at" | "updated_at"> & {
+  recorrente?: boolean;
+  meses_recorrencia?: number | null;
+};
+export type DespesaCreate = Omit<Despesa, "id" | "created_at" | "updated_at" | "parcelas" | "total_parcelas"> & {
+  total_parcelas?: number | null;
+  recorrente?: boolean;
+  meses_recorrencia?: number | null;
+};
 export type ReceitaUpdate = Partial<ReceitaCreate>;
 export type DespesaUpdate = Partial<Omit<DespesaCreate, "total_parcelas" | "parcelamento">>;
+

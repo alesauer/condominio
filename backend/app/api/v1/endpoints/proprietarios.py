@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.core.database import get_db
 from app.core.permissions import admin_required
 from app.schemas.proprietario import ProprietarioCreate, ProprietarioUpdate, ProprietarioResponse
+from app.schemas.apartamento import ApartamentoListResponse
 from app.schemas.common import PaginatedResponse
 from app.services import proprietario_service
 from app.utils.pagination import paginate
+from app.models.apartamento import Apartamento
 
 router = APIRouter()
 
@@ -39,3 +42,14 @@ async def update_proprietario(proprietario_id: str, data: ProprietarioUpdate, db
 @router.delete("/{proprietario_id}", status_code=204, dependencies=[Depends(admin_required)])
 async def delete_proprietario(proprietario_id: str, db: AsyncSession = Depends(get_db)):
     await proprietario_service.delete_proprietario(db, proprietario_id)
+
+
+@router.get("/{proprietario_id}/apartamentos", response_model=PaginatedResponse[ApartamentoListResponse])
+async def list_apartamentos_proprietario(
+    proprietario_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Apartamento).where(Apartamento.proprietario_id == proprietario_id).order_by(Apartamento.numero)
+    return await paginate(db, query, page=page, page_size=page_size)

@@ -1,3 +1,4 @@
+from uuid import uuid4
 from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -8,7 +9,7 @@ from app.core.database import Base
 class TokenRefresh(Base):
     __tablename__ = "tokens_refresh"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
     token = Column(String(512), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)

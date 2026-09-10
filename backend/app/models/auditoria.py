@@ -1,15 +1,15 @@
+from uuid import uuid4
 from sqlalchemy import Column, String, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
-from app.models.base import BaseModelMixin
 
 
 class Auditoria(Base):
     __tablename__ = "auditoria"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True)
     usuario_nome = Column(String(255), nullable=True)
     acao = Column(String(50), nullable=False)

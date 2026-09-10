@@ -6,20 +6,47 @@ import type { PaginatedResponse } from "@/types";
 const KEY = "despesas";
 
 export function useDespesas(params?: Record<string, any>) {
-  return useQuery({ queryKey: [KEY, params], queryFn: () => api.get<PaginatedResponse<Despesa>>("/despesas", { params }).then(r => r.data) });
+  return useQuery({
+    queryKey: [KEY, params],
+    queryFn: () => api.get<PaginatedResponse<Despesa>>("/despesas", { params }).then((r) => r.data),
+  });
 }
+
 export function useDespesa(id: string) {
-  return useQuery({ queryKey: [KEY, id], queryFn: () => api.get<Despesa>(`/despesas/${id}`).then(r => r.data), enabled: !!id });
+  return useQuery({
+    queryKey: [KEY, id],
+    queryFn: () => api.get<Despesa>(`/despesas/${id}`).then((r) => r.data),
+    enabled: !!id,
+  });
 }
+
 export function useCreateDespesa() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (data: DespesaCreate) => api.post("/despesas", data), onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }) });
+  return useMutation({
+    mutationFn: (data: DespesaCreate) => api.post<Despesa>("/despesas", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY], exact: false, refetchType: "all" });
+    },
+  });
 }
+
 export function useUpdateDespesa() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: ({ id, data }: { id: string; data: DespesaUpdate }) => api.put(`/despesas/${id}`, data), onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }) });
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: DespesaUpdate }) =>
+      api.put<Despesa>(`/despesas/${id}`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY], exact: false, refetchType: "all" });
+    },
+  });
 }
+
 export function useDeleteDespesa() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (id: string) => api.delete(`/despesas/${id}`), onSuccess: () => qc.invalidateQueries({ queryKey: [KEY] }) });
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/despesas/${id}`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY], exact: false, refetchType: "all" });
+    },
+  });
 }

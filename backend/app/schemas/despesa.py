@@ -23,8 +23,12 @@ class DespesaCreate(BaseModel):
     data_pagamento: Optional[date] = None
     status: StatusFinanceiro = StatusFinanceiro.pendente
     observacao: Optional[str] = None
+    comprovante_url: Optional[str] = None
+    comprovante_nome: Optional[str] = None
     parcelamento: bool = False
     total_parcelas: Optional[int] = None
+    recorrente: bool = False
+    meses_recorrencia: Optional[int] = None
 
 
 class DespesaUpdate(BaseModel):
@@ -37,6 +41,8 @@ class DespesaUpdate(BaseModel):
     data_pagamento: Optional[date] = None
     status: Optional[StatusFinanceiro] = None
     observacao: Optional[str] = None
+    comprovante_url: Optional[str] = None
+    comprovante_nome: Optional[str] = None
 
 
 class DespesaParcelaResponse(BaseModel):
@@ -65,6 +71,8 @@ class DespesaResponse(BaseModel):
     data_pagamento: Optional[date]
     status: StatusFinanceiro
     observacao: Optional[str]
+    comprovante_url: Optional[str] = None
+    comprovante_nome: Optional[str] = None
     parcelamento: bool
     total_parcelas: Optional[int]
     parcelas: List[DespesaParcelaResponse] = []

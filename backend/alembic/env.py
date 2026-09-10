@@ -7,7 +7,15 @@ from app.core.database import Base
 import app.models  # noqa: F401 — ensure all models are loaded
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+
+def _sync_database_url(database_url: str) -> str:
+    if database_url.startswith("postgresql+asyncpg://"):
+        return database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    return database_url
+
+
+config.set_main_option("sqlalchemy.url", _sync_database_url(settings.DATABASE_URL))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

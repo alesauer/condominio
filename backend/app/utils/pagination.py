@@ -1,6 +1,6 @@
 from typing import TypeVar, Generic, List
 from pydantic import BaseModel
-from sqlalchemy import Select, func
+from sqlalchemy import select, Select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 T = TypeVar("T")

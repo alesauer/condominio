@@ -8,9 +8,11 @@ export interface Proprietario {
   updated_at: string;
 }
 
-export type ProprietarioCreate = Omit<
-  Proprietario,
-  "id" | "created_at" | "updated_at"
->;
+export interface ProprietarioCreate {
+  nome: string;
+  cpf: string;
+  telefone?: string | null;
+  email?: string | null;
+}
 
 export type ProprietarioUpdate = Partial<ProprietarioCreate>;

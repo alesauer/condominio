@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import { SortableHeader } from "@/components/ui/sortable-header";
+import { useSortableData } from "@/hooks/use-sortable-data";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -16,6 +17,12 @@ export default function InadimplenciaPage() {
   const { data: config, isLoading: configLoading } = useQuery({ queryKey: ["inadimplencia", "config"], queryFn: () => api.get("/inadimplencia/config").then(r => r.data) });
   const { data: atrasadas, isLoading: atrasLoading } = useQuery({ queryKey: ["inadimplencia", "atrasadas"], queryFn: () => api.get("/inadimplencia/cobrancas-atrasadas").then(r => r.data) });
   const [form, setForm] = useState({ percentual_multa: "2.00", percentual_juros_mes: "1.00", dias_tolerancia: "5" });
+
+  const { items: sortedAtrasadas, sortField, sortDirection, requestSort } = useSortableData(
+    atrasadas || [],
+    "vencimento",
+    "asc"
+  );
 
   useEffect(() => {
     if (config) setForm({ percentual_multa: String(config.percentual_multa), percentual_juros_mes: String(config.percentual_juros_mes), dias_tolerancia: String(config.dias_tolerancia) });
@@ -45,15 +52,53 @@ export default function InadimplenciaPage() {
         </CardContent></Card>
       )}
       {atrasLoading ? <Skeleton className="h-60" /> : (
-        <div className="rounded-md border"><table className="w-full text-sm">
-          <thead><tr className="border-b bg-muted/50 text-left"><th className="p-3 font-medium">Descrição</th><th className="p-3 font-medium">Vencimento</th><th className="p-3 font-medium">Valor</th><th className="p-3 font-medium">Multa</th><th className="p-3 font-medium">Juros</th><th className="p-3 font-medium">Total</th><th className="p-3 font-medium">Status</th></tr></thead>
-          <tbody>
-            {atrasadas?.map((c: any) => (
-              <tr key={c.id} className="border-b hover:bg-muted/30"><td className="p-3 font-medium">{c.descricao}</td><td className="p-3">{formatDate(c.vencimento)}</td><td className="p-3">{formatCurrency(c.valor)}</td><td className="p-3">{formatCurrency(c.multa || 0)}</td><td className="p-3">{formatCurrency(c.juros || 0)}</td><td className="p-3 font-bold">{formatCurrency(c.valor_total)}</td><td className="p-3"><Badge variant="destructive">{c.status}</Badge></td></tr>
-            ))}
-            {(!atrasadas || atrasadas.length === 0) && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhuma cobrança em atraso</td></tr>}
-          </tbody>
-        </table></div>
+        <div className="rounded-md border overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50 text-left">
+                <SortableHeader field="descricao" currentField={sortField} direction={sortDirection} onSort={requestSort}>
+                  Descrição
+                </SortableHeader>
+                <SortableHeader field="vencimento" currentField={sortField} direction={sortDirection} onSort={requestSort}>
+                  Vencimento
+                </SortableHeader>
+                <SortableHeader field="valor" currentField={sortField} direction={sortDirection} onSort={requestSort} align="right">
+                  Valor
+                </SortableHeader>
+                <SortableHeader field="multa" currentField={sortField} direction={sortDirection} onSort={requestSort} align="right">
+                  Multa
+                </SortableHeader>
+                <SortableHeader field="juros" currentField={sortField} direction={sortDirection} onSort={requestSort} align="right">
+                  Juros
+                </SortableHeader>
+                <SortableHeader field="valor_total" currentField={sortField} direction={sortDirection} onSort={requestSort} align="right">
+                  Total
+                </SortableHeader>
+                <SortableHeader field="status" currentField={sortField} direction={sortDirection} onSort={requestSort} align="center">
+                  Status
+                </SortableHeader>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedAtrasadas.map((c: any) => (
+                <tr key={c.id} className="border-b hover:bg-muted/30">
+                  <td className="p-3 font-medium">{c.descricao}</td>
+                  <td className="p-3">{formatDate(c.vencimento)}</td>
+                  <td className="p-3 text-right">{formatCurrency(c.valor)}</td>
+                  <td className="p-3 text-right">{formatCurrency(c.multa || 0)}</td>
+                  <td className="p-3 text-right">{formatCurrency(c.juros || 0)}</td>
+                  <td className="p-3 text-right font-bold">{formatCurrency(c.valor_total)}</td>
+                  <td className="p-3 text-center">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      {c.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {sortedAtrasadas.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhuma cobrança em atraso</td></tr>}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

@@ -2,7 +2,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from fastapi import HTTPException, status
 from app.models.proprietario import Proprietario
-from app.models.apartamento_proprietario import ApartamentoProprietario
 
 
 async def create_proprietario(db: AsyncSession, data: dict) -> Proprietario:
@@ -37,8 +36,7 @@ async def list_proprietarios(db: AsyncSession, page: int = 1, page_size: int = 2
 async def update_proprietario(db: AsyncSession, proprietario_id: str, data: dict) -> Proprietario:
     prop = await get_proprietario(db, proprietario_id)
     for key, value in data.items():
-        if value is not None:
-            setattr(prop, key, value)
+        setattr(prop, key, value)
     await db.commit()
     await db.refresh(prop)
     return prop

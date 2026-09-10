@@ -5,7 +5,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: condo
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -21,7 +21,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8080:8000"
     volumes:
       - ./backend:/app
       - uploads:/app/data
@@ -29,7 +29,7 @@ services:
       - PYTHONUNBUFFERED=1
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/condo
       - SECRET_KEY=dev-secret-key-change-in-production
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - CORS_ORIGINS=["http://localhost:3080", "http://localhost:3000", "http://localhost:3001"]
       - UPLOAD_DIR=/app/data/uploads
     networks:
       - condo-net
@@ -38,7 +38,7 @@ services:
         condition: service_healthy
     command: >
       sh -c "uv pip install --system -r requirements.txt &&
-             python -m alembic upgrade head &&
+             alembic upgrade head &&
              python seed.py &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
@@ -47,7 +47,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3080:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

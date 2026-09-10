@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Form
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Form, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -6,14 +6,15 @@ from pathlib import Path
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.models.documento import Documento
 from app.utils.pagination import paginate
-from app.utils.file_storage import save_upload, get_file_path
+from app.utils.file_storage import save_upload, get_file_path, delete_file
 
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(get_current_user)])
 async def list_documentos(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), categoria: str = Query(None), db: AsyncSession = Depends(get_db)):
     query = select(Documento)
     if categoria: query = query.where(Documento.categoria == categoria)
@@ -33,17 +34,25 @@ async def upload_documento(
     return doc
 
 
-@router.get("/{documento_id}/download")
+@router.get("/{documento_id}/download", dependencies=[Depends(get_current_user)])
 async def download_documento(documento_id: str, db: AsyncSession = Depends(get_db)):
     r = await db.execute(select(Documento).where(Documento.id == documento_id))
     doc = r.scalar_one_or_none()
-    if not doc: return {"detail": "Not found"}
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
     path = get_file_path(doc.caminho_arquivo)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo não encontrado no servidor")
     return FileResponse(path, filename=doc.nome, media_type=doc.tipo_mime or "application/octet-stream")
 
 
 @router.delete("/{documento_id}", status_code=204, dependencies=[Depends(admin_required)])
 async def delete_documento(documento_id: str, db: AsyncSession = Depends(get_db)):
     r = await db.execute(select(Documento).where(Documento.id == documento_id))
-    doc = r.scalar_one()
-    await db.delete(doc); await db.commit()
+    doc = r.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento não encontrado")
+    if doc.caminho_arquivo:
+        delete_file(doc.caminho_arquivo)
+    await db.delete(doc)
+    await db.commit()

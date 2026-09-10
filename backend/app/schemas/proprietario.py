@@ -29,7 +29,3 @@ class ProprietarioResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class VinculoApartamento(BaseModel):
-    apartamento_id: UUID

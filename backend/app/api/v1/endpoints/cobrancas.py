@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.permissions import admin_required
-from app.schemas.cobranca import CobrancaResponse
+from app.schemas.cobranca import CobrancaResponse, CobrancaGerarMensal, CobrancaGerarMensalResult
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
 from app.utils.pagination import paginate
@@ -26,11 +26,24 @@ async def list_cobrancas(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
+@router.post("/gerar-mensal", response_model=CobrancaGerarMensalResult, status_code=201)
+async def gerar_cobrancas_mensais(
+    data: CobrancaGerarMensal,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    return await cobranca_service.gerar_cobrancas_mensais(db, data.model_dump(), usuario=current_user)
+
+
 @router.get("/{cobranca_id}", response_model=CobrancaResponse, dependencies=[Depends(admin_required)])
 async def get_cobranca(cobranca_id: str, db: AsyncSession = Depends(get_db)):
     return await cobranca_service.get_cobranca(db, cobranca_id)
 
 
-@router.put("/{cobranca_id}/pagar", response_model=CobrancaResponse, dependencies=[Depends(admin_required)])
-async def pagar_cobranca(cobranca_id: str, db: AsyncSession = Depends(get_db)):
-    return await cobranca_service.pagar_cobranca(db, cobranca_id)
+@router.put("/{cobranca_id}/pagar", response_model=CobrancaResponse)
+async def pagar_cobranca(
+    cobranca_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    return await cobranca_service.pagar_cobranca(db, cobranca_id, usuario=current_user)
