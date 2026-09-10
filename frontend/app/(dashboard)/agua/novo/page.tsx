@@ -32,7 +32,7 @@ export default function NovoRateioPage() {
           <div className="space-y-2"><Label>Competência</Label><Input required type="date" value={competencia} onChange={e => setCompetencia(e.target.value)} /></div>
           <div className="space-y-2"><Label>Valor Total (R$)</Label><Input required type="number" step="0.01" value={valor} onChange={e => setValor(e.target.value)} /></div>
           <div className="space-y-2"><Label>Observação</Label><Input value={obs} onChange={e => setObs(e.target.value)} /></div>
-          <p className="text-xs text-muted-foreground">O rateio será calculado automaticamente por peso dos apartamentos ocupados/alugados (Padrão=1, Área Privativa=1.5, Cobertura=2).</p>
+          <p className="text-xs text-muted-foreground">O rateio será dividido automaticamente entre os apartamentos proporcionalmente à fração ideal cadastrada de cada unidade.</p>
           <div className="flex gap-2 justify-end"><Link href="/agua"><Button variant="outline" type="button">Cancelar</Button></Link><Button type="submit" disabled={loading}>{loading ? "Calculando..." : "Calcular Rateio"}</Button></div>
         </form>
       </CardContent></Card>

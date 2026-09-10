@@ -16,6 +16,10 @@ class AguaRateioApartamentoResponse(BaseModel):
     peso: float
     soma_pesos: float
     valor_calculado: float
+    apartamento_numero: Optional[str] = None
+    apartamento_bloco: Optional[str] = None
+    apartamento_tipo: Optional[str] = None
+    fracao_ideal: Optional[float] = None
 
     class Config:
         from_attributes = True

@@ -370,3 +370,61 @@ class TestCobrancaService:
         assert res.data_pagamento == date.today()
         mock_db.commit.assert_awaited_once()
 
+
+# ── AguaRateioService ──────────────────────────────────────────────
+
+class TestAguaRateioService:
+    async def test_create_rateio_fracao_ideal(self, mock_db):
+        from app.services import agua_rateio_service
+        from app.models.agua_rateio import AguaRateio
+        from app.models.agua_rateio_apartamento import AguaRateioApartamento
+
+        apto1 = Apartamento(id=uuid.uuid4(), numero="101", fracao_ideal=Decimal("0.6000"))
+        apto2 = Apartamento(id=uuid.uuid4(), numero="201", fracao_ideal=Decimal("0.4000"))
+
+        mock_db.execute.side_effect = [
+            make_mock_result(scalar_one_or_none_return=None),  # check existing
+            make_mock_result(scalars_all_return=[apto1, apto2]),  # get aptos
+            make_mock_result(scalar_one_or_none_return=AguaRateio(
+                id=uuid.uuid4(),
+                competencia=date(2026, 9, 1),
+                valor_total=Decimal("1000.00"),
+                apartamentos=[
+                    AguaRateioApartamento(apartamento_id=apto1.id, peso=Decimal("0.6000"), soma_pesos=Decimal("1.0000"), valor_calculado=Decimal("600.00")),
+                    AguaRateioApartamento(apartamento_id=apto2.id, peso=Decimal("0.4000"), soma_pesos=Decimal("1.0000"), valor_calculado=Decimal("400.00")),
+                ]
+            ))
+        ]
+
+        data = {
+            "competencia": date(2026, 9, 1),
+            "valor_total": 1000.00,
+            "observacao": "Rateio Set/2026",
+        }
+
+        res = await agua_rateio_service.create_rateio(mock_db, data)
+        assert res is not None
+        assert mock_db.add.call_count >= 3  # 1 rateio + 2 details
+        mock_db.commit.assert_awaited_once()
+
+    async def test_create_rateio_duplicated_competencia(self, mock_db):
+        from app.services import agua_rateio_service
+        from app.models.agua_rateio import AguaRateio
+
+        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=AguaRateio(competencia=date(2026, 9, 1), valor_total=100))
+
+        data = {"competencia": date(2026, 9, 1), "valor_total": 500.0}
+        with pytest.raises(HTTPException) as exc:
+            await agua_rateio_service.create_rateio(mock_db, data)
+        assert exc.value.status_code == 400
+        assert "Já existe rateio" in exc.value.detail
+
+    async def test_get_rateio_not_found(self, mock_db):
+        from app.services import agua_rateio_service
+
+        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=None)
+        with pytest.raises(HTTPException) as exc:
+            await agua_rateio_service.get_rateio(mock_db, str(uuid.uuid4()))
+        assert exc.value.status_code == 404
+
+
