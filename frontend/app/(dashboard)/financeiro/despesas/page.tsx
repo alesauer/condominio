@@ -21,8 +21,9 @@ import {
 import { SortableHeader } from "@/components/ui/sortable-header";
 import { useSortableData } from "@/hooks/use-sortable-data";
 import { ConfirmarPagamentoModal } from "@/components/financeiro/confirmar-pagamento-modal";
+import { DuplicarMesModal } from "@/components/financeiro/duplicar-mes-modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Calendar, DollarSign, CheckCircle2, Clock, Paperclip, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Calendar, DollarSign, CheckCircle2, Clock, Paperclip, Download, Copy } from "lucide-react";
 import { toast } from "sonner";
 import type { Despesa } from "@/types/financeiro";
 
@@ -89,6 +90,9 @@ export default function DespesasPage() {
   // Modal de Confirmação de Pagamento com Comprovante
   const [pagamentoModalItem, setPagamentoModalItem] = useState<Despesa | null>(null);
   const [pagamentoModalOpen, setPagamentoModalOpen] = useState(false);
+
+  // Modal de Duplicação de Mês
+  const [duplicarModalOpen, setDuplicarModalOpen] = useState(false);
 
   const queryParams = useMemo(() => {
     const params: Record<string, any> = { page, page_size: 50 };
@@ -261,12 +265,28 @@ export default function DespesasPage() {
           <h1 className="text-2xl font-bold tracking-tight">Despesas</h1>
           <p className="text-muted-foreground">Gerencie e visualize as despesas e contas mensais do condomínio</p>
         </div>
-        <Link href="/financeiro/despesas/nova">
-          <Button className="shadow-sm">
-            <Plus className="mr-2 h-4 w-4" /> Nova Despesa
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setDuplicarModalOpen(true)}
+            disabled={selectedMes === "all"}
+            className="shadow-sm border-primary/20 hover:border-primary/50 text-foreground"
+            title={
+              selectedMes === "all"
+                ? "Selecione um mês específico para duplicar"
+                : `Duplicar despesas de ${currentMonthLabel} para o mês posterior`
+            }
+          >
+            <Copy className="mr-2 h-4 w-4 text-primary" /> Duplicar Mês
           </Button>
-        </Link>
+          <Link href="/financeiro/despesas/nova">
+            <Button className="shadow-sm">
+              <Plus className="mr-2 h-4 w-4" /> Nova Despesa
+            </Button>
+          </Link>
+        </div>
       </div>
+
 
       {/* Month Navigation & Filter Toolbar */}
       <Card className="border-border/60 shadow-sm">
@@ -659,6 +679,21 @@ export default function DespesasPage() {
         tipo="despesas"
         onSuccess={() => refetch()}
       />
+
+      {/* Modal de Duplicação de Mês */}
+      <DuplicarMesModal
+        isOpen={duplicarModalOpen}
+        onClose={() => setDuplicarModalOpen(false)}
+        tipo="despesas"
+        mesAtual={selectedMes === "all" ? currentDate.getMonth() + 1 : parseInt(selectedMes, 10)}
+        anoAtual={selectedAno === "all" ? currentDate.getFullYear() : parseInt(selectedAno, 10)}
+        onSuccess={(mesDest, anoDest) => {
+          setSelectedMes(String(mesDest));
+          setSelectedAno(String(anoDest));
+          refetch();
+        }}
+      />
     </div>
   );
 }
+

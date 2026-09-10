@@ -46,3 +46,30 @@ export type DespesaCreate = Omit<Despesa, "id" | "created_at" | "updated_at" | "
 export type ReceitaUpdate = Partial<ReceitaCreate>;
 export type DespesaUpdate = Partial<Omit<DespesaCreate, "total_parcelas" | "parcelamento">>;
 
+export interface DuplicarMesRequest {
+  mes_origem: number;
+  ano_origem: number;
+  mes_destino: number;
+  ano_destino: number;
+  sobrescrever?: boolean;
+}
+
+export interface DuplicarMesResponse {
+  duplicados: number;
+  apagados: number;
+  mes_origem: number;
+  ano_origem: number;
+  mes_destino: number;
+  ano_destino: number;
+  mensagem: string;
+}
+
+export interface VerificarDuplicacaoResponse {
+  total_origem: number;
+  total_destino: number;
+  mes_origem: number;
+  ano_origem: number;
+  mes_destino: number;
+  ano_destino: number;
+}
+

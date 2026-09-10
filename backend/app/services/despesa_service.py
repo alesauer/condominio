@@ -171,3 +171,132 @@ async def upload_comprovante_despesa(db: AsyncSession, despesa_id: str, file, da
     await db.refresh(desp)
     return desp
 
+
+async def verificar_duplicacao_despesas(
+    db: AsyncSession, mes_origem: int, ano_origem: int, mes_destino: int, ano_destino: int
+) -> dict:
+    from sqlalchemy import func
+
+    q_origem = select(func.count(Despesa.id)).where(
+        extract("month", Despesa.competencia) == mes_origem,
+        extract("year", Despesa.competencia) == ano_origem,
+    )
+    total_origem = (await db.execute(q_origem)).scalar() or 0
+
+    q_destino = select(func.count(Despesa.id)).where(
+        extract("month", Despesa.competencia) == mes_destino,
+        extract("year", Despesa.competencia) == ano_destino,
+    )
+    total_destino = (await db.execute(q_destino)).scalar() or 0
+
+    return {
+        "total_origem": total_origem,
+        "total_destino": total_destino,
+        "mes_origem": mes_origem,
+        "ano_origem": ano_origem,
+        "mes_destino": mes_destino,
+        "ano_destino": ano_destino,
+    }
+
+
+async def duplicar_despesas_mes(
+    db: AsyncSession,
+    mes_origem: int,
+    ano_origem: int,
+    mes_destino: int,
+    ano_destino: int,
+    sobrescrever: bool = False,
+    usuario=None,
+) -> dict:
+    import calendar
+    from app.models.receita import StatusFinanceiro
+
+    q_origem = select(Despesa).where(
+        extract("month", Despesa.competencia) == mes_origem,
+        extract("year", Despesa.competencia) == ano_origem,
+    )
+    res_origem = await db.execute(q_origem)
+    despesas_origem = res_origem.scalars().all()
+
+    if not despesas_origem:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Não há despesas cadastradas no mês de origem ({mes_origem:02d}/{ano_origem}).",
+        )
+
+    q_destino = select(Despesa).where(
+        extract("month", Despesa.competencia) == mes_destino,
+        extract("year", Despesa.competencia) == ano_destino,
+    )
+    res_destino = await db.execute(q_destino)
+    despesas_destino = res_destino.scalars().all()
+
+    if despesas_destino and not sobrescrever:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Já existem {len(despesas_destino)} despesa(s) no mês de destino ({mes_destino:02d}/{ano_destino}). Confirme a substituição para prosseguir.",
+        )
+
+    apagados = 0
+    if despesas_destino and sobrescrever:
+        for d_dest in despesas_destino:
+            await db.delete(d_dest)
+        apagados = len(despesas_destino)
+
+    max_dias_destino = calendar.monthrange(ano_destino, mes_destino)[1]
+    duplicados = 0
+
+    for d in despesas_origem:
+        dia_comp = min(d.competencia.day, max_dias_destino)
+        nova_competencia = date(ano_destino, mes_destino, dia_comp)
+
+        novo_vencimento = None
+        if d.vencimento:
+            dia_venc = min(d.vencimento.day, max_dias_destino)
+            novo_vencimento = date(ano_destino, mes_destino, dia_venc)
+
+        nova_desp = Despesa(
+            descricao=d.descricao,
+            tipo=d.tipo,
+            categoria=d.categoria,
+            valor=d.valor,
+            competencia=nova_competencia,
+            vencimento=novo_vencimento,
+            data_pagamento=None,
+            status=StatusFinanceiro.pendente,
+            observacao=d.observacao,
+            parcelamento=False,
+            total_parcelas=None,
+            comprovante_url=None,
+            comprovante_nome=None,
+        )
+        db.add(nova_desp)
+        duplicados += 1
+
+    await registrar_auditoria(
+        db,
+        acao="DUPLICAR",
+        entidade_tipo="despesas",
+        entidade_id=None,
+        dados_novos={
+            "origem": f"{mes_origem:02d}/{ano_origem}",
+            "destino": f"{mes_destino:02d}/{ano_destino}",
+            "duplicados": duplicados,
+            "apagados": apagados,
+        },
+        usuario=usuario,
+    )
+    await db.commit()
+
+    return {
+        "duplicados": duplicados,
+        "apagados": apagados,
+        "mes_origem": mes_origem,
+        "ano_origem": ano_origem,
+        "mes_destino": mes_destino,
+        "ano_destino": ano_destino,
+        "mensagem": f"{duplicados} despesa(s) duplicada(s) com sucesso para {mes_destino:02d}/{ano_destino}."
+        + (f" ({apagados} anteriores foram apagadas)" if apagados > 0 else ""),
+    }
+
+

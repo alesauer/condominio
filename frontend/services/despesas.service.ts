@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
-import type { Despesa, DespesaCreate, DespesaUpdate } from "@/types/financeiro";
+import type {
+  Despesa,
+  DespesaCreate,
+  DespesaUpdate,
+  DuplicarMesRequest,
+  DuplicarMesResponse,
+  VerificarDuplicacaoResponse,
+} from "@/types/financeiro";
 import type { PaginatedResponse } from "@/types";
 
 const KEY = "despesas";
@@ -50,3 +57,24 @@ export function useDeleteDespesa() {
     },
   });
 }
+
+export function useVerificarDuplicacaoDespesas() {
+  return useMutation({
+    mutationFn: (params: { mes_origem: number; ano_origem: number; mes_destino: number; ano_destino: number }) =>
+      api
+        .post<VerificarDuplicacaoResponse>("/despesas/verificar-duplicacao", null, { params })
+        .then((r) => r.data),
+  });
+}
+
+export function useDuplicarDespesasMes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: DuplicarMesRequest) =>
+      api.post<DuplicarMesResponse>("/despesas/duplicar-mes", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY], exact: false, refetchType: "all" });
+    },
+  });
+}
+

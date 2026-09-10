@@ -55,3 +55,31 @@ class ReceitaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DuplicarMesRequest(BaseModel):
+    mes_origem: int
+    ano_origem: int
+    mes_destino: int
+    ano_destino: int
+    sobrescrever: bool = False
+
+
+class DuplicarMesResponse(BaseModel):
+    duplicados: int
+    apagados: int
+    mes_origem: int
+    ano_origem: int
+    mes_destino: int
+    ano_destino: int
+    mensagem: str
+
+
+class VerificarDuplicacaoResponse(BaseModel):
+    total_origem: int
+    total_destino: int
+    mes_origem: int
+    ano_origem: int
+    mes_destino: int
+    ano_destino: int
+

@@ -26,14 +26,16 @@ from app.models.usuario import Usuario, RoleUsuario
 
 # ── Helpers ────────────────────────────────────────────────────────
 
-def make_mock_result(scalar_one_or_none_return=None, scalars_all_return=None):
+def make_mock_result(scalar_one_or_none_return=None, scalars_all_return=None, scalar_return=None):
     """Create a mock execute result. SyncMock for sync methods like scalar_one_or_none."""
     from unittest.mock import MagicMock
     result = MagicMock()  # Use MagicMock NOT AsyncMock — scalar_one_or_none is sync
     result.scalar_one_or_none.return_value = scalar_one_or_none_return
+    result.scalar.return_value = scalar_return
     if scalars_all_return is not None:
         result.scalars.return_value.all.return_value = scalars_all_return
     return result
+
 
 
 # ── ApartamentoService ─────────────────────────────────────────────
@@ -286,6 +288,50 @@ class TestDespesaService:
         assert updated.comprovante_nome == "recibo.pdf"
         mock_db.commit.assert_awaited()
 
+    async def test_verificar_duplicacao(self, mock_db):
+        mock_db.execute.side_effect = [
+            make_mock_result(scalar_return=5),  # origem
+            make_mock_result(scalar_return=2),  # destino
+        ]
+        res = await despesa_service.verificar_duplicacao_despesas(mock_db, 1, 2026, 2, 2026)
+        assert res["total_origem"] == 5
+        assert res["total_destino"] == 2
+
+    async def test_duplicar_mes_success(self, mock_db):
+        d1 = Despesa(id=uuid.uuid4(), descricao="Conta Luz", valor=Decimal("150.00"), competencia=date(2026, 1, 15), vencimento=date(2026, 1, 25))
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[d1]),  # origem
+            make_mock_result(scalars_all_return=[]),    # destino (vazio)
+        ]
+        res = await despesa_service.duplicar_despesas_mes(mock_db, 1, 2026, 2, 2026, sobrescrever=False)
+        assert res["duplicados"] == 1
+        assert res["apagados"] == 0
+        mock_db.commit.assert_awaited()
+
+    async def test_duplicar_mes_conflict(self, mock_db):
+        d1 = Despesa(id=uuid.uuid4(), descricao="Conta Luz", valor=Decimal("150.00"), competencia=date(2026, 1, 15))
+        d_dest = Despesa(id=uuid.uuid4(), descricao="Antiga", valor=Decimal("100.00"), competencia=date(2026, 2, 15))
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[d1]),
+            make_mock_result(scalars_all_return=[d_dest]),
+        ]
+        with pytest.raises(HTTPException) as exc:
+            await despesa_service.duplicar_despesas_mes(mock_db, 1, 2026, 2, 2026, sobrescrever=False)
+        assert exc.value.status_code == 409
+
+    async def test_duplicar_mes_sobrescrever(self, mock_db):
+        d1 = Despesa(id=uuid.uuid4(), descricao="Conta Luz", valor=Decimal("150.00"), competencia=date(2026, 1, 15))
+        d_dest = Despesa(id=uuid.uuid4(), descricao="Antiga", valor=Decimal("100.00"), competencia=date(2026, 2, 15))
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[d1]),
+            make_mock_result(scalars_all_return=[d_dest]),
+        ]
+        res = await despesa_service.duplicar_despesas_mes(mock_db, 1, 2026, 2, 2026, sobrescrever=True)
+        assert res["duplicados"] == 1
+        assert res["apagados"] == 1
+        mock_db.delete.assert_called_once()
+        mock_db.commit.assert_awaited()
+
 
 # ── ReceitaService ─────────────────────────────────────────────────
 
@@ -344,6 +390,51 @@ class TestReceitaService:
         assert updated.comprovante_url == "/uploads/comprovantes/recibo.pdf"
         assert updated.comprovante_nome == "recibo.pdf"
         mock_db.commit.assert_awaited()
+
+    async def test_verificar_duplicacao(self, mock_db):
+        mock_db.execute.side_effect = [
+            make_mock_result(scalar_return=4),  # origem
+            make_mock_result(scalar_return=0),  # destino
+        ]
+        res = await receita_service.verificar_duplicacao_receitas(mock_db, 1, 2026, 2, 2026)
+        assert res["total_origem"] == 4
+        assert res["total_destino"] == 0
+
+    async def test_duplicar_mes_success(self, mock_db):
+        r1 = Receita(id=uuid.uuid4(), descricao="Condomínio 101", valor=Decimal("400.00"), competencia=date(2026, 1, 1), vencimento=date(2026, 1, 10))
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[r1]),  # origem
+            make_mock_result(scalars_all_return=[]),    # destino (vazio)
+        ]
+        res = await receita_service.duplicar_receitas_mes(mock_db, 1, 2026, 2, 2026, sobrescrever=False)
+        assert res["duplicados"] == 1
+        assert res["apagados"] == 0
+        mock_db.commit.assert_awaited()
+
+    async def test_duplicar_mes_conflict(self, mock_db):
+        r1 = Receita(id=uuid.uuid4(), descricao="Condomínio 101", valor=Decimal("400.00"), competencia=date(2026, 1, 1))
+        r_dest = Receita(id=uuid.uuid4(), descricao="Antiga", valor=Decimal("300.00"), competencia=date(2026, 2, 1))
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[r1]),
+            make_mock_result(scalars_all_return=[r_dest]),
+        ]
+        with pytest.raises(HTTPException) as exc:
+            await receita_service.duplicar_receitas_mes(mock_db, 1, 2026, 2, 2026, sobrescrever=False)
+        assert exc.value.status_code == 409
+
+    async def test_duplicar_mes_sobrescrever(self, mock_db):
+        r1 = Receita(id=uuid.uuid4(), descricao="Condomínio 101", valor=Decimal("400.00"), competencia=date(2026, 1, 1))
+        r_dest = Receita(id=uuid.uuid4(), descricao="Antiga", valor=Decimal("300.00"), competencia=date(2026, 2, 1))
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[r1]),
+            make_mock_result(scalars_all_return=[r_dest]),
+        ]
+        res = await receita_service.duplicar_receitas_mes(mock_db, 1, 2026, 2, 2026, sobrescrever=True)
+        assert res["duplicados"] == 1
+        assert res["apagados"] == 1
+        mock_db.delete.assert_called_once()
+        mock_db.commit.assert_awaited()
+
 
 
 # ── CobrancaService ────────────────────────────────────────────────

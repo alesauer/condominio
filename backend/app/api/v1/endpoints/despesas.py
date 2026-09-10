@@ -6,7 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.permissions import admin_required
 from app.api.deps import get_current_user
-from app.schemas.despesa import DespesaCreate, DespesaUpdate, DespesaResponse, DespesaParcelaResponse
+from app.schemas.despesa import (
+    DespesaCreate,
+    DespesaUpdate,
+    DespesaResponse,
+    DespesaParcelaResponse,
+    DuplicarMesRequest,
+    DuplicarMesResponse,
+    VerificarDuplicacaoResponse,
+)
 from app.schemas.common import PaginatedResponse
 from app.services import despesa_service
 from app.utils.pagination import paginate
@@ -32,6 +40,36 @@ async def list_despesas(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
+@router.post("/verificar-duplicacao", response_model=VerificarDuplicacaoResponse, dependencies=[Depends(admin_required)])
+async def verificar_duplicacao_despesas(
+    mes_origem: int = Query(..., ge=1, le=12),
+    ano_origem: int = Query(..., ge=2000, le=2100),
+    mes_destino: int = Query(..., ge=1, le=12),
+    ano_destino: int = Query(..., ge=2000, le=2100),
+    db: AsyncSession = Depends(get_db),
+):
+    return await despesa_service.verificar_duplicacao_despesas(
+        db, mes_origem=mes_origem, ano_origem=ano_origem, mes_destino=mes_destino, ano_destino=ano_destino
+    )
+
+
+@router.post("/duplicar-mes", response_model=DuplicarMesResponse, dependencies=[Depends(admin_required)])
+async def duplicar_despesas_mes(
+    data: DuplicarMesRequest,
+    db: AsyncSession = Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    return await despesa_service.duplicar_despesas_mes(
+        db,
+        mes_origem=data.mes_origem,
+        ano_origem=data.ano_origem,
+        mes_destino=data.mes_destino,
+        ano_destino=data.ano_destino,
+        sobrescrever=data.sobrescrever,
+        usuario=usuario,
+    )
+
+
 @router.get("/{despesa_id}", response_model=DespesaResponse, dependencies=[Depends(admin_required)])
 async def get_despesa(despesa_id: str, db: AsyncSession = Depends(get_db)):
     return await despesa_service.get_despesa(db, despesa_id)
@@ -40,6 +78,7 @@ async def get_despesa(despesa_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("", response_model=DespesaResponse, status_code=201, dependencies=[Depends(admin_required)])
 async def create_despesa(data: DespesaCreate, db: AsyncSession = Depends(get_db)):
     return await despesa_service.create_despesa(db, data.model_dump())
+
 
 
 @router.put("/{despesa_id}", response_model=DespesaResponse, dependencies=[Depends(admin_required)])
