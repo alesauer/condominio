@@ -11,7 +11,6 @@ import {
   TrendingUp,
   TrendingDown,
   CreditCard,
-  Layers,
   Droplets,
   Flame,
   Bell,
@@ -44,7 +43,6 @@ const menuGroups = [
       { href: "/financeiro/receitas", label: "Receitas", icon: TrendingUp },
       { href: "/financeiro/despesas", label: "Despesas", icon: TrendingDown },
       { href: "/financeiro/cobrancas", label: "Cobranças", icon: CreditCard },
-      { href: "/financeiro/extraordinarias", label: "Extraordinárias", icon: Layers },
     ],
   },
   {

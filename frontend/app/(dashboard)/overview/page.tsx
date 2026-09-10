@@ -16,7 +16,6 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  Receipt,
   PlusCircle,
   CreditCard,
   Building2,
@@ -105,14 +104,6 @@ export default function OverviewPage() {
       color: "text-amber-500",
       bg: "bg-amber-500/10",
     },
-    {
-      title: "Contas Extraordinárias",
-      value: cardsData ? formatCurrency(cardsData.contas_extraordinarias) : "R$ 0,00",
-      description: "Despesas extraordinárias do mês",
-      icon: Receipt,
-      color: "text-violet-500",
-      bg: "bg-violet-500/10",
-    },
   ];
 
   return (
@@ -139,8 +130,8 @@ export default function OverviewPage() {
       </div>
 
       {cardsLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {[...Array(5)].map((_, i) => (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
             <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))}
         </div>
@@ -151,7 +142,7 @@ export default function OverviewPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => {
             const Icon = card.icon;
             return (
