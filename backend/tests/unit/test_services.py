@@ -370,6 +370,52 @@ class TestCobrancaService:
         assert res.data_pagamento == date.today()
         mock_db.commit.assert_awaited_once()
 
+    async def test_gerar_cobrancas_mensais_completo(self, mock_db):
+        from app.services import cobranca_service
+        from app.models.cobranca import Cobranca
+        from app.models.despesa import Despesa
+        from app.models.agua_rateio import AguaRateio
+        from app.models.agua_rateio_apartamento import AguaRateioApartamento
+        from app.models.leitura_gas import LeituraGas
+
+        apto1 = Apartamento(id=uuid.uuid4(), numero="101", fracao_ideal=Decimal("0.6000"))
+        apto2 = Apartamento(id=uuid.uuid4(), numero="201", fracao_ideal=Decimal("0.4000"))
+
+        desp1 = Despesa(id=uuid.uuid4(), descricao="Limpeza", valor=Decimal("500.00"), competencia=date(2026, 9, 1), parcelamento=False)
+        rateio_agua = AguaRateio(id=uuid.uuid4(), competencia=date(2026, 9, 1), valor_total=Decimal("200.00"))
+        det_agua1 = AguaRateioApartamento(apartamento_id=apto1.id, rateio_id=rateio_agua.id, valor_calculado=Decimal("120.00"))
+        det_agua2 = AguaRateioApartamento(apartamento_id=apto2.id, rateio_id=rateio_agua.id, valor_calculado=Decimal("80.00"))
+        gas1 = LeituraGas(apartamento_id=apto1.id, competencia=date(2026, 9, 1), leitura_atual=Decimal("10.0"), valor_cobrado=Decimal("50.00"))
+        gas2 = LeituraGas(apartamento_id=apto2.id, competencia=date(2026, 9, 1), leitura_atual=Decimal("5.0"), valor_cobrado=Decimal("30.00"))
+
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[apto1, apto2]), # aptos
+            make_mock_result(scalars_all_return=[desp1]), # despesas unicas
+            make_mock_result(scalars_all_return=[]), # despesas parcelas
+            make_mock_result(scalar_one_or_none_return=rateio_agua), # rateio agua
+            make_mock_result(scalars_all_return=[det_agua1, det_agua2]), # rateio agua detalhes
+            make_mock_result(scalars_all_return=[gas1, gas2]), # leituras gas
+            make_mock_result(scalars_all_return=[]), # existentes
+            make_mock_result(scalars_all_return=[]), # recarregadas
+        ]
+
+        data = {
+            "competencia": date(2026, 9, 1),
+            "vencimento": date(2026, 9, 10),
+            "valor_base_condominio": 0.0,
+            "incluir_despesas": True,
+            "incluir_agua": True,
+            "incluir_gas": True,
+        }
+
+        res = await cobranca_service.gerar_cobrancas_mensais(mock_db, data)
+        assert res["total_despesas_mes"] == 500.0
+        assert res["total_agua"] == 200.0
+        assert res["total_gas"] == 80.0
+        assert res["total_valor"] == 780.0
+        mock_db.commit.assert_awaited()
+
+
 
 # ── AguaRateioService ──────────────────────────────────────────────
 

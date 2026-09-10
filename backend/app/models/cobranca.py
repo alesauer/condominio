@@ -23,3 +23,12 @@ class Cobranca(Base, BaseModelMixin):
 
     apartamento = relationship("Apartamento", back_populates="cobrancas")
     receita = relationship("Receita")
+
+    @property
+    def apartamento_numero(self) -> str | None:
+        return self.apartamento.numero if self.apartamento else None
+
+    @property
+    def apartamento_bloco(self) -> str | None:
+        return self.apartamento.bloco if self.apartamento else None
+

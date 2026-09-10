@@ -29,6 +29,8 @@ export interface Cobranca {
   id: string; apartamento_id: string; descricao: string; competencia: string;
   vencimento: string; valor: number; multa: number | null; juros: number | null;
   valor_total: number; data_pagamento: string | null; status: StatusFinanceiro;
+  apartamento_numero?: string | null;
+  apartamento_bloco?: string | null;
   created_at: string; updated_at: string;
 }
 

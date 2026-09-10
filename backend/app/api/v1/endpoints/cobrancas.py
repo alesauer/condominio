@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.permissions import admin_required
-from app.schemas.cobranca import CobrancaResponse, CobrancaGerarMensal, CobrancaGerarMensalResult
+from app.schemas.cobranca import CobrancaResponse, CobrancaGerarMensal, CobrancaGerarMensalResult, CobrancaPreviaResult
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
 from app.utils.pagination import paginate
@@ -24,6 +24,14 @@ async def list_cobrancas(
         db, page=page, page_size=page_size, apartamento_id=apartamento_id, competencia=competencia, status=status
     )
     return await paginate(db, query, page=page, page_size=page_size)
+
+
+@router.post("/previa-mensal", response_model=CobrancaPreviaResult, dependencies=[Depends(admin_required)])
+async def calcular_previa_cobrancas(
+    data: CobrancaGerarMensal,
+    db: AsyncSession = Depends(get_db),
+):
+    return await cobranca_service.calcular_previa_cobrancas(db, data.model_dump())
 
 
 @router.post("/gerar-mensal", response_model=CobrancaGerarMensalResult, status_code=201)
