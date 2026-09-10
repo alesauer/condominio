@@ -50,7 +50,7 @@ export default function CobrancasPage() {
   const [formGerar, setFormGerar] = useState({
     competencia: defaultComp,
     vencimento: defaultVenc,
-    valor_base_condominio: "0.00",
+    valor_fundo_reserva: "0.00",
     incluir_despesas: true,
     incluir_agua: true,
     incluir_gas: true,
@@ -91,7 +91,7 @@ export default function CobrancasPage() {
         .mutateAsync({
           competencia: formGerar.competencia,
           vencimento: formGerar.vencimento,
-          valor_base_condominio: Number(formGerar.valor_base_condominio) || 0,
+          valor_fundo_reserva: Number(formGerar.valor_fundo_reserva) || 0,
           incluir_despesas: formGerar.incluir_despesas,
           incluir_agua: formGerar.incluir_agua,
           incluir_gas: formGerar.incluir_gas,
@@ -105,7 +105,7 @@ export default function CobrancasPage() {
     dialogOpen,
     formGerar.competencia,
     formGerar.vencimento,
-    formGerar.valor_base_condominio,
+    formGerar.valor_fundo_reserva,
     formGerar.incluir_despesas,
     formGerar.incluir_agua,
     formGerar.incluir_gas,
@@ -126,7 +126,7 @@ export default function CobrancasPage() {
       const res = await gerarMut.mutateAsync({
         competencia: formGerar.competencia,
         vencimento: formGerar.vencimento,
-        valor_base_condominio: Number(formGerar.valor_base_condominio) || 0,
+        valor_fundo_reserva: Number(formGerar.valor_fundo_reserva) || 0,
         incluir_despesas: formGerar.incluir_despesas,
         incluir_agua: formGerar.incluir_agua,
         incluir_gas: formGerar.incluir_gas,
@@ -161,7 +161,7 @@ export default function CobrancasPage() {
                 <Calculator className="h-5 w-5 text-primary" /> Gerar Lote de Cobranças do Mês
               </DialogTitle>
               <DialogDescription>
-                Consolidação automática: soma as despesas do mês por fração ideal, rateio de água e consumo individual de gás por apartamento.
+                Consolidação automática: soma as despesas do mês por fração ideal, rateio de água, consumo individual de gás e valor do fundo de reserva por apartamento.
               </DialogDescription>
             </DialogHeader>
 
@@ -249,14 +249,14 @@ export default function CobrancasPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="valor_base">Fundo Reserva / Taxa Fixa Adicional (R$)</Label>
+                  <Label htmlFor="valor_fundo_reserva">Valor do Fundo de Reserva (R$)</Label>
                   <Input
-                    id="valor_base"
+                    id="valor_fundo_reserva"
                     type="number"
                     step="0.01"
                     placeholder="0.00"
-                    value={formGerar.valor_base_condominio}
-                    onChange={(e) => setFormGerar({ ...formGerar, valor_base_condominio: e.target.value })}
+                    value={formGerar.valor_fundo_reserva}
+                    onChange={(e) => setFormGerar({ ...formGerar, valor_fundo_reserva: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -281,7 +281,7 @@ export default function CobrancasPage() {
 
                 {previa ? (
                   <div className="space-y-2.5">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                       <div className="p-2 rounded bg-muted/40 border">
                         <span className="text-muted-foreground block">Despesas Mês</span>
                         <span className="font-semibold text-rose-600">{formatCurrency(previa.total_despesas_mes)}</span>
@@ -293,6 +293,10 @@ export default function CobrancasPage() {
                       <div className="p-2 rounded bg-muted/40 border">
                         <span className="text-muted-foreground block">Gás Total</span>
                         <span className="font-semibold text-amber-600">{formatCurrency(previa.total_gas)}</span>
+                      </div>
+                      <div className="p-2 rounded bg-muted/40 border">
+                        <span className="text-muted-foreground block">F. Reserva</span>
+                        <span className="font-semibold text-emerald-600">{formatCurrency(previa.total_fundo_reserva ?? previa.total_base ?? 0)}</span>
                       </div>
                       <div className="p-2 rounded bg-primary/10 border border-primary/20">
                         <span className="text-primary font-medium block">Total Geral</span>
@@ -309,6 +313,7 @@ export default function CobrancasPage() {
                             {formGerar.incluir_despesas && <th className="p-1.5 font-medium text-right">Despesas</th>}
                             {formGerar.incluir_agua && <th className="p-1.5 font-medium text-right">Água</th>}
                             {formGerar.incluir_gas && <th className="p-1.5 font-medium text-right">Gás</th>}
+                            {Number(formGerar.valor_fundo_reserva) > 0 && <th className="p-1.5 font-medium text-right">F. Reserva</th>}
                             <th className="p-1.5 font-medium text-right">Total Apto</th>
                           </tr>
                         </thead>
@@ -334,6 +339,9 @@ export default function CobrancasPage() {
                               )}
                               {formGerar.incluir_gas && (
                                 <td className="p-1.5 text-right">{formatCurrency(a.valor_gas)}</td>
+                              )}
+                              {Number(formGerar.valor_fundo_reserva) > 0 && (
+                                <td className="p-1.5 text-right">{formatCurrency(a.valor_fundo_reserva ?? a.valor_base ?? 0)}</td>
                               )}
                               <td className="p-1.5 text-right font-bold text-primary">{formatCurrency(a.valor_total)}</td>
                             </tr>
@@ -361,6 +369,7 @@ export default function CobrancasPage() {
           </DialogContent>
         </Dialog>
       </div>
+
 
       <div className="flex items-center gap-2">
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>

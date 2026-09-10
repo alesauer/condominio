@@ -493,7 +493,7 @@ class TestCobrancaService:
         data = {
             "competencia": date(2026, 9, 1),
             "vencimento": date(2026, 9, 10),
-            "valor_base_condominio": 0.0,
+            "valor_fundo_reserva": 50.0,
             "incluir_despesas": True,
             "incluir_agua": True,
             "incluir_gas": True,
@@ -503,7 +503,8 @@ class TestCobrancaService:
         assert res["total_despesas_mes"] == 500.0
         assert res["total_agua"] == 200.0
         assert res["total_gas"] == 80.0
-        assert res["total_valor"] == 780.0
+        assert res["total_fundo_reserva"] == 100.0
+        assert res["total_valor"] == 880.0
         mock_db.commit.assert_awaited()
 
 

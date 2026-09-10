@@ -29,7 +29,8 @@ class CobrancaResponse(BaseModel):
 class CobrancaGerarMensal(BaseModel):
     competencia: date
     vencimento: date
-    valor_base_condominio: float = Field(default=0.0, ge=0, description="Valor base / fundo de reserva adicional (opcional)")
+    valor_fundo_reserva: float = Field(default=0.0, ge=0, description="Valor do fundo de reserva por apartamento (opcional)")
+    valor_base_condominio: Optional[float] = Field(default=None, description="Alias legado para valor_fundo_reserva")
     incluir_despesas: bool = Field(default=True, description="Somar despesas do mês e ratear por fração ideal")
     incluir_agua: bool = Field(default=True, description="Incluir rateio de água da competência se apurado")
     incluir_gas: bool = Field(default=True, description="Incluir consumo de gás da competência se apurado")
@@ -45,6 +46,7 @@ class CobrancaPreviaApartamento(BaseModel):
     valor_despesas: float = 0.0
     valor_agua: float = 0.0
     valor_gas: float = 0.0
+    valor_fundo_reserva: float = 0.0
     valor_base: float = 0.0
     valor_total: float = 0.0
     ja_gerado: bool = False
@@ -56,6 +58,7 @@ class CobrancaPreviaResult(BaseModel):
     total_despesas_mes: float = 0.0
     total_agua: float = 0.0
     total_gas: float = 0.0
+    total_fundo_reserva: float = 0.0
     total_base: float = 0.0
     total_geral: float = 0.0
     apartamentos: List[CobrancaPreviaApartamento] = []
@@ -66,8 +69,10 @@ class CobrancaGerarMensalResult(BaseModel):
     total_despesas_mes: Optional[float] = 0.0
     total_agua: Optional[float] = 0.0
     total_gas: Optional[float] = 0.0
+    total_fundo_reserva: Optional[float] = 0.0
     total_base: Optional[float] = 0.0
     total_valor: float
     competencia: date
     cobrancas: List[CobrancaResponse]
+
 

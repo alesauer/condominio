@@ -8,6 +8,7 @@ const KEY = "cobrancas";
 export interface GerarCobrancasPayload {
   competencia: string;
   vencimento: string;
+  valor_fundo_reserva?: number;
   valor_base_condominio?: number;
   incluir_despesas?: boolean;
   incluir_agua?: boolean;
@@ -24,7 +25,8 @@ export interface CobrancaPreviaApartamento {
   valor_despesas: number;
   valor_agua: number;
   valor_gas: number;
-  valor_base: number;
+  valor_fundo_reserva?: number;
+  valor_base?: number;
   valor_total: number;
   ja_gerado: boolean;
 }
@@ -35,10 +37,12 @@ export interface CobrancaPreviaResult {
   total_despesas_mes: number;
   total_agua: number;
   total_gas: number;
-  total_base: number;
+  total_fundo_reserva?: number;
+  total_base?: number;
   total_geral: number;
   apartamentos: CobrancaPreviaApartamento[];
 }
+
 
 export function useCobrancas(params?: Record<string, any>) {
   return useQuery({

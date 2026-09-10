@@ -1,6 +1,6 @@
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -87,8 +87,12 @@ async def _calcular_componentes_cobranca(
     incluir_despesas: bool = True,
     incluir_agua: bool = True,
     incluir_gas: bool = True,
-    valor_base_condominio: Decimal = Decimal("0.00"),
+    valor_fundo_reserva: Decimal = Decimal("0.00"),
+    valor_base_condominio: Optional[Decimal] = None,
 ) -> Dict[str, Any]:
+    if valor_base_condominio is not None and valor_fundo_reserva == Decimal("0.00"):
+        valor_fundo_reserva = valor_base_condominio
+
     # 1. Carrega todos os apartamentos
     aptos_result = await db.execute(select(Apartamento).order_by(Apartamento.numero))
     apartamentos = aptos_result.scalars().all()
@@ -179,7 +183,7 @@ async def _calcular_componentes_cobranca(
                 gas_map[lg.apartamento_id] = val_dec
                 total_gas += val_dec
 
-    total_base = valor_base_condominio * len(apartamentos)
+    total_fundo = valor_fundo_reserva * len(apartamentos)
 
     return {
         "apartamentos": apartamentos,
@@ -191,15 +195,17 @@ async def _calcular_componentes_cobranca(
         "total_agua": total_agua,
         "gas_map": gas_map,
         "total_gas": total_gas,
-        "valor_base": valor_base_condominio,
-        "total_base": total_base,
+        "valor_fundo_reserva": valor_fundo_reserva,
+        "total_fundo_reserva": total_fundo,
+        "valor_base": valor_fundo_reserva,
+        "total_base": total_fundo,
     }
 
 
 async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, Any]:
     competencia: date = data["competencia"]
     vencimento: date = data["vencimento"]
-    valor_base = Decimal(str(data.get("valor_base_condominio", 0)))
+    valor_fundo = Decimal(str(data.get("valor_fundo_reserva") or data.get("valor_base_condominio") or 0))
     incluir_despesas: bool = data.get("incluir_despesas", True)
     incluir_agua: bool = data.get("incluir_agua", True)
     incluir_gas: bool = data.get("incluir_gas", True)
@@ -210,7 +216,7 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
         incluir_despesas=incluir_despesas,
         incluir_agua=incluir_agua,
         incluir_gas=incluir_gas,
-        valor_base_condominio=valor_base,
+        valor_fundo_reserva=valor_fundo,
     )
 
     apartamentos = calc["apartamentos"]
@@ -231,8 +237,8 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
         v_desp = despesas_map.get(apto.id, Decimal("0.00"))
         v_agua = agua_map.get(apto.id, Decimal("0.00"))
         v_gas = gas_map.get(apto.id, Decimal("0.00"))
-        v_base = valor_base
-        v_tot = (v_desp + v_agua + v_gas + v_base).quantize(Decimal("0.01"))
+        v_fundo_apto = valor_fundo
+        v_tot = (v_desp + v_agua + v_gas + v_fundo_apto).quantize(Decimal("0.01"))
         total_geral += v_tot
 
         tipo_str = str(apto.tipo.value) if hasattr(apto.tipo, "value") else str(apto.tipo)
@@ -245,7 +251,8 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
             "valor_despesas": float(v_desp),
             "valor_agua": float(v_agua),
             "valor_gas": float(v_gas),
-            "valor_base": float(v_base),
+            "valor_fundo_reserva": float(v_fundo_apto),
+            "valor_base": float(v_fundo_apto),
             "valor_total": float(v_tot),
             "ja_gerado": apto.id in existentes_apto_ids,
         })
@@ -256,6 +263,7 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
         "total_despesas_mes": float(calc["total_despesas_mes"]),
         "total_agua": float(calc["total_agua"]),
         "total_gas": float(calc["total_gas"]),
+        "total_fundo_reserva": float(calc["total_fundo_reserva"]),
         "total_base": float(calc["total_base"]),
         "total_geral": float(total_geral),
         "apartamentos": detalhes_aptos,
@@ -265,7 +273,7 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
 async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) -> Dict[str, Any]:
     competencia: date = data["competencia"]
     vencimento: date = data["vencimento"]
-    valor_base = Decimal(str(data.get("valor_base_condominio", 0)))
+    valor_fundo = Decimal(str(data.get("valor_fundo_reserva") or data.get("valor_base_condominio") or 0))
     incluir_despesas: bool = data.get("incluir_despesas", True)
     incluir_agua: bool = data.get("incluir_agua", True)
     incluir_gas: bool = data.get("incluir_gas", True)
@@ -277,7 +285,7 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         incluir_despesas=incluir_despesas,
         incluir_agua=incluir_agua,
         incluir_gas=incluir_gas,
-        valor_base_condominio=valor_base,
+        valor_fundo_reserva=valor_fundo,
     )
 
     apartamentos = calc["apartamentos"]
@@ -302,8 +310,8 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         v_desp = despesas_map.get(apto.id, Decimal("0.00"))
         v_agua = agua_map.get(apto.id, Decimal("0.00"))
         v_gas = gas_map.get(apto.id, Decimal("0.00"))
-        v_base = valor_base
-        valor_total_apto = (v_desp + v_agua + v_gas + v_base).quantize(Decimal("0.01"))
+        v_fundo_apto = valor_fundo
+        valor_total_apto = (v_desp + v_agua + v_gas + v_fundo_apto).quantize(Decimal("0.01"))
 
         # Monta detalhamento das parcelas para a descrição
         partes = []
@@ -313,8 +321,8 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
             partes.append(f"Água: R$ {v_agua:.2f}")
         if v_gas > 0:
             partes.append(f"Gás: R$ {v_gas:.2f}")
-        if v_base > 0:
-            partes.append(f"Base: R$ {v_base:.2f}")
+        if v_fundo_apto > 0:
+            partes.append(f"Fundo Reserva: R$ {v_fundo_apto:.2f}")
 
         detalhe_str = f" ({' | '.join(partes)})" if partes else ""
 
@@ -352,6 +360,7 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
             "total_despesas_mes": float(calc["total_despesas_mes"]),
             "total_agua": float(calc["total_agua"]),
             "total_gas": float(calc["total_gas"]),
+            "total_fundo_reserva": float(calc["total_fundo_reserva"]),
         },
         usuario=usuario,
     )
@@ -375,8 +384,10 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         "total_despesas_mes": float(calc["total_despesas_mes"]),
         "total_agua": float(calc["total_agua"]),
         "total_gas": float(calc["total_gas"]),
+        "total_fundo_reserva": float(calc["total_fundo_reserva"]),
         "total_base": float(calc["total_base"]),
         "total_valor": float(total_valor),
         "competencia": competencia,
         "cobrancas": cobrancas_recarregadas,
     }
+
