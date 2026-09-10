@@ -3,6 +3,7 @@ export interface ApartamentoVinculoInfo {
   numero: string;
   bloco?: string | null;
   tipo_vinculo: "proprietario" | "residente";
+  is_responsavel?: boolean;
   data_inicio?: string | null;
   data_fim?: string | null;
 }
@@ -28,6 +29,7 @@ export interface MoradorCreate {
   veiculo?: string | null;
   tipo: "proprietario" | "inquilino" | "morador" | "dependente";
   apartamento_id?: string | null;
+  definir_como_responsavel?: boolean;
 }
 
 export type MoradorUpdate = Partial<MoradorCreate>;
@@ -35,6 +37,7 @@ export type MoradorUpdate = Partial<MoradorCreate>;
 export interface VincularApartamentoPayload {
   apartamento_id: string;
   tipo_vinculo?: "proprietario" | "residente";
+  definir_como_responsavel?: boolean;
   data_inicio?: string | null;
   data_fim?: string | null;
 }

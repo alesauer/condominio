@@ -41,6 +41,7 @@ export default function EditMoradorPage() {
 
   const [selectedApartamentoToLink, setSelectedApartamentoToLink] = useState("");
   const [tipoVinculoNovo, setTipoVinculoNovo] = useState<"residente" | "proprietario">("residente");
+  const [definirComoResp, setDefinirComoResp] = useState(false);
 
   useEffect(() => {
     if (morador) {
@@ -87,10 +88,12 @@ export default function EditMoradorPage() {
         data: {
           apartamento_id: selectedApartamentoToLink,
           tipo_vinculo: tipoVinculoNovo,
+          definir_como_responsavel: definirComoResp,
         },
       });
       await refetch();
       setSelectedApartamentoToLink("");
+      setDefinirComoResp(false);
       toast.success("Apartamento vinculado com sucesso!");
     } catch {
       toast.error("Erro ao vincular apartamento");
@@ -270,21 +273,28 @@ export default function EditMoradorPage() {
                       key={ap.apartamento_id}
                       className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 text-sm"
                     >
-                      <div className="space-y-0.5">
+                      <div className="space-y-1">
                         <div className="font-semibold text-foreground flex items-center gap-1.5">
                           <span>Apto {ap.numero}</span>
                           {ap.bloco && <span className="text-xs text-muted-foreground font-normal">({ap.bloco})</span>}
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={
-                            ap.tipo_vinculo === "proprietario"
-                              ? "bg-blue-500/15 text-blue-600 border-blue-500/30 text-[11px]"
-                              : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[11px]"
-                          }
-                        >
-                          {ap.tipo_vinculo === "proprietario" ? "Proprietário" : "Residente"}
-                        </Badge>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge
+                            variant="outline"
+                            className={
+                              ap.tipo_vinculo === "proprietario"
+                                ? "bg-blue-500/15 text-blue-600 border-blue-500/30 text-[11px]"
+                                : "bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[11px]"
+                            }
+                          >
+                            {ap.tipo_vinculo === "proprietario" ? "Proprietário" : "Residente"}
+                          </Badge>
+                          {ap.is_responsavel && (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] py-0 px-1.5 font-medium">
+                              Resp. Financeiro
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <Button
                         type="button"
@@ -343,6 +353,19 @@ export default function EditMoradorPage() {
                       <SelectItem value="proprietario">Vínculo: Proprietário</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="definirComoRespMorador"
+                    checked={definirComoResp}
+                    onChange={(e) => setDefinirComoResp(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="definirComoRespMorador" className="text-xs font-normal cursor-pointer">
+                    Definir como Responsável Administrativo / Financeiro
+                  </Label>
                 </div>
 
                 <Button

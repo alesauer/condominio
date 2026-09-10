@@ -24,8 +24,9 @@ class ApartamentoCreate(BaseModel):
     vaga_demarcada: Optional[str] = None
     status: StatusApartamento = StatusApartamento.vazio
     proprietario_id: Optional[UUID] = None
+    responsavel_id: Optional[UUID] = None
 
-    @field_validator("proprietario_id", mode="before")
+    @field_validator("proprietario_id", "responsavel_id", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "" or v is None:
@@ -42,8 +43,9 @@ class ApartamentoUpdate(BaseModel):
     vaga_demarcada: Optional[str] = None
     status: Optional[StatusApartamento] = None
     proprietario_id: Optional[UUID] = None
+    responsavel_id: Optional[UUID] = None
 
-    @field_validator("proprietario_id", mode="before")
+    @field_validator("proprietario_id", "responsavel_id", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
         if v == "" or v is None:
@@ -62,6 +64,8 @@ class ApartamentoResponse(BaseModel):
     status: StatusApartamento
     proprietario_id: Optional[UUID]
     proprietario: Optional[ProprietarioResumo] = None
+    responsavel_id: Optional[UUID] = None
+    responsavel: Optional[ProprietarioResumo] = None
     created_at: datetime
     updated_at: datetime
 
@@ -77,6 +81,8 @@ class ApartamentoListResponse(BaseModel):
     status: StatusApartamento
     proprietario_id: Optional[UUID]
     proprietario: Optional[ProprietarioResumo] = None
+    responsavel_id: Optional[UUID] = None
+    responsavel: Optional[ProprietarioResumo] = None
 
     class Config:
         from_attributes = True

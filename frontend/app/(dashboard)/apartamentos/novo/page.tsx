@@ -26,6 +26,7 @@ export default function NovoApartamentoPage() {
     metragem: "",
     vaga_demarcada: "",
     proprietario_id: "",
+    responsavel_id: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +41,7 @@ export default function NovoApartamentoPage() {
         metragem: form.metragem ? Number(form.metragem) : null,
         vaga_demarcada: form.vaga_demarcada || null,
         proprietario_id: form.proprietario_id && form.proprietario_id !== "none" ? form.proprietario_id : null,
+        responsavel_id: form.responsavel_id && form.responsavel_id !== "none" ? form.responsavel_id : null,
       });
       toast.success("Apartamento criado com sucesso!");
       router.push("/apartamentos");
@@ -70,7 +72,7 @@ export default function NovoApartamentoPage() {
             </div>
             <div>
               <CardTitle className="text-lg">Dados da Unidade</CardTitle>
-              <CardDescription>Identificação, tipo e proprietário responsável</CardDescription>
+              <CardDescription>Identificação, tipo, proprietário e responsável administrativo</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -127,24 +129,46 @@ export default function NovoApartamentoPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="proprietario">Proprietário Responsável</Label>
-              <Select
-                value={form.proprietario_id}
-                onValueChange={(v) => setForm({ ...form, proprietario_id: v })}
-              >
-                <SelectTrigger id="proprietario">
-                  <SelectValue placeholder="Selecione um morador/proprietário..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sem proprietário vinculado</SelectItem>
-                  {moradoresData?.items.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.nome} ({m.tipo.toUpperCase()}) {m.cpf ? `- CPF: ${m.cpf}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="proprietario">Proprietário</Label>
+                <Select
+                  value={form.proprietario_id}
+                  onValueChange={(v) => setForm({ ...form, proprietario_id: v })}
+                >
+                  <SelectTrigger id="proprietario">
+                    <SelectValue placeholder="Selecione o proprietário..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem proprietário vinculado</SelectItem>
+                    {moradoresData?.items.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.nome} ({m.tipo.toUpperCase()}) {m.cpf ? `- CPF: ${m.cpf}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responsavel">Resp. Administrativo</Label>
+                <Select
+                  value={form.responsavel_id}
+                  onValueChange={(v) => setForm({ ...form, responsavel_id: v })}
+                >
+                  <SelectTrigger id="responsavel">
+                    <SelectValue placeholder="Selecione o responsável..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Não definido</SelectItem>
+                    {moradoresData?.items.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.nome} ({m.tipo.toUpperCase()})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

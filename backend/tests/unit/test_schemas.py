@@ -50,6 +50,15 @@ class TestApartamentoCreate:
         data = ApartamentoCreate(numero="101", proprietario_id=None)
         assert data.proprietario_id is None
 
+    def test_empty_responsavel_id_becomes_none(self):
+        data = ApartamentoCreate(numero="101", responsavel_id="")
+        assert data.responsavel_id is None
+
+    def test_with_responsavel_id(self):
+        rid = uuid.uuid4()
+        data = ApartamentoCreate(numero="101", responsavel_id=rid)
+        assert data.responsavel_id == rid
+
     def test_missing_required_numero_raises(self):
         with pytest.raises(ValidationError):
             ApartamentoCreate()
@@ -159,19 +168,59 @@ class TestMoradorUpdate:
         assert data.model_dump(exclude_unset=True) == {}
 
 
+class TestMoradorResponse:
+    def test_extract_relationships_with_responsavel(self):
+        class MockApto:
+            def __init__(self, id, numero, bloco=None, responsavel_id=None):
+                self.id = id
+                self.numero = numero
+                self.bloco = bloco
+                self.responsavel_id = responsavel_id
+
+        class MockMorador:
+            def __init__(self, id, nome):
+                self.id = id
+                self.nome = nome
+                self.cpf = "123"
+                self.telefone = None
+                self.email = None
+                self.veiculo = None
+                self.tipo = TipoMorador.proprietario
+                self.apartamentos = []
+                self.apartamentos_proprietario = []
+                self.apartamentos_responsavel = []
+                self.created_at = datetime.now()
+                self.updated_at = datetime.now()
+
+        m_id = uuid.uuid4()
+        apto1 = MockApto(uuid.uuid4(), "101", "A", responsavel_id=m_id)
+        morador_obj = MockMorador(m_id, "Carlos")
+        morador_obj.apartamentos_proprietario = [apto1]
+        morador_obj.apartamentos_responsavel = [apto1]
+
+        resp = MoradorResponse.model_validate(morador_obj)
+        assert len(resp.apartamentos) == 1
+        assert resp.apartamentos[0].numero == "101"
+        assert resp.apartamentos[0].is_responsavel is True
+        assert resp.apartamentos[0].tipo_vinculo == "proprietario"
+
+
 class TestVincularApartamento:
     def test_valid(self):
         aid = uuid.uuid4()
         data = VincularApartamento(apartamento_id=aid)
         assert data.apartamento_id == aid
+        assert data.definir_como_responsavel is False
 
     def test_with_dates(self):
         data = VincularApartamento(
             apartamento_id=uuid.uuid4(),
+            definir_como_responsavel=True,
             data_inicio=date(2024, 1, 1),
             data_fim=date(2024, 12, 31),
         )
         assert data.data_inicio == date(2024, 1, 1)
+        assert data.definir_como_responsavel is True
 
 
 # ── Despesa ────────────────────────────────────────────────────────

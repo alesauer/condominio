@@ -203,6 +203,9 @@ export default function MoradoresPage() {
                                 {ap.tipo_vinculo === "proprietario" && (
                                   <span className="ml-1 text-[10px] text-blue-600 dark:text-blue-400 font-semibold">• Prop</span>
                                 )}
+                                {ap.is_responsavel && (
+                                  <span className="ml-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">• Resp</span>
+                                )}
                               </Badge>
                             ))
                           ) : (

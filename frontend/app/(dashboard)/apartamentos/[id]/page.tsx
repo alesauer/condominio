@@ -42,9 +42,11 @@ export default function EditApartamentoPage() {
     metragem: "",
     vaga_demarcada: "",
     proprietario_id: "",
+    responsavel_id: "",
   });
 
   const [selectedMoradorToLink, setSelectedMoradorToLink] = useState("");
+  const [definirComoResp, setDefinirComoResp] = useState(false);
 
   useEffect(() => {
     if (apto) {
@@ -57,6 +59,7 @@ export default function EditApartamentoPage() {
         metragem: apto.metragem?.toString() || "",
         vaga_demarcada: apto.vaga_demarcada || "",
         proprietario_id: apto.proprietario_id || "",
+        responsavel_id: apto.responsavel_id || "",
       });
     }
   }, [apto]);
@@ -75,12 +78,29 @@ export default function EditApartamentoPage() {
           metragem: form.metragem ? Number(form.metragem) : null,
           vaga_demarcada: form.vaga_demarcada || null,
           proprietario_id: form.proprietario_id && form.proprietario_id !== "none" ? form.proprietario_id : null,
+          responsavel_id: form.responsavel_id && form.responsavel_id !== "none" ? form.responsavel_id : null,
         },
       });
       await refetchApto();
       toast.success("Apartamento atualizado com sucesso!");
     } catch {
       toast.error("Erro ao atualizar apartamento");
+    }
+  };
+
+  const handleSetResponsavelQuick = async (moradorId: string, nome: string) => {
+    try {
+      await updateMut.mutateAsync({
+        id,
+        data: {
+          responsavel_id: moradorId,
+        },
+      });
+      setForm((prev) => ({ ...prev, responsavel_id: moradorId }));
+      await refetchApto();
+      toast.success(`${nome} agora é o responsável administrativo pelo apartamento!`);
+    } catch {
+      toast.error("Erro ao definir responsável administrativo");
     }
   };
 
@@ -94,10 +114,16 @@ export default function EditApartamentoPage() {
         data: {
           apartamento_id: id,
           tipo_vinculo: "residente",
+          definir_como_responsavel: definirComoResp,
         },
       });
+      if (definirComoResp) {
+        setForm((prev) => ({ ...prev, responsavel_id: selectedMoradorToLink }));
+        await refetchApto();
+      }
       await refetchMoradoresApto();
       setSelectedMoradorToLink("");
+      setDefinirComoResp(false);
       toast.success("Morador vinculado com sucesso!");
     } catch {
       toast.error("Erro ao vincular morador");
@@ -225,24 +251,46 @@ export default function EditApartamentoPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="proprietario">Proprietário</Label>
-                  <Select
-                    value={form.proprietario_id}
-                    onValueChange={(v) => setForm({ ...form, proprietario_id: v })}
-                  >
-                    <SelectTrigger id="proprietario">
-                      <SelectValue placeholder="Selecione o proprietário..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sem proprietário vinculado</SelectItem>
-                      {todosMoradores?.items.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.nome} ({m.tipo.toUpperCase()}) {m.cpf ? `- CPF: ${m.cpf}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="proprietario">Proprietário</Label>
+                    <Select
+                      value={form.proprietario_id}
+                      onValueChange={(v) => setForm({ ...form, proprietario_id: v })}
+                    >
+                      <SelectTrigger id="proprietario">
+                        <SelectValue placeholder="Selecione o proprietário..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem proprietário vinculado</SelectItem>
+                        {todosMoradores?.items.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.nome} ({m.tipo.toUpperCase()}) {m.cpf ? `- CPF: ${m.cpf}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="responsavel">Responsável Administrativo / Financeiro</Label>
+                    <Select
+                      value={form.responsavel_id}
+                      onValueChange={(v) => setForm({ ...form, responsavel_id: v })}
+                    >
+                      <SelectTrigger id="responsavel">
+                        <SelectValue placeholder="Selecione o responsável..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Não definido</SelectItem>
+                        {todosMoradores?.items.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.nome} ({m.tipo.toUpperCase()})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -305,33 +353,59 @@ export default function EditApartamentoPage() {
               {/* Lista dos residentes */}
               <div className="space-y-2">
                 {moradoresApto && moradoresApto.length > 0 ? (
-                  moradoresApto.map((m) => (
-                    <div
-                      key={m.id}
-                      className="flex items-center justify-between p-3 rounded-lg border bg-muted/30 text-sm"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="font-semibold text-foreground">{m.nome}</div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Badge variant="outline" className="text-[10px] capitalize">
-                            {tipoLabel[m.tipo] || m.tipo}
-                          </Badge>
-                          {m.telefone && <span>{m.telefone}</span>}
+                  moradoresApto.map((m) => {
+                    const isResp = form.responsavel_id === m.id;
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border text-sm transition-all ${
+                          isResp ? "bg-emerald-500/10 border-emerald-500/30" : "bg-muted/30"
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="font-semibold text-foreground flex items-center gap-1.5">
+                            <span>{m.nome}</span>
+                            {isResp && (
+                              <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] py-0 px-1.5 font-medium">
+                                Resp. Financeiro
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-[10px] capitalize">
+                              {tipoLabel[m.tipo] || m.tipo}
+                            </Badge>
+                            {m.telefone && <span>{m.telefone}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {!isResp && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSetResponsavelQuick(m.id, m.nome)}
+                              title="Tornar este morador o responsável administrativo"
+                              className="h-8 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15"
+                            >
+                              Tornar Resp.
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleUnlinkMorador(m.id, m.nome)}
+                            title="Desvincular deste apartamento"
+                            disabled={desvincularMut.isPending}
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleUnlinkMorador(m.id, m.nome)}
-                        title="Desvincular deste apartamento"
-                        disabled={desvincularMut.isPending}
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground">
                     Nenhum morador residente registrado neste apartamento.
@@ -361,6 +435,19 @@ export default function EditApartamentoPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-center space-x-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="definirComoResp"
+                    checked={definirComoResp}
+                    onChange={(e) => setDefinirComoResp(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="definirComoResp" className="text-xs font-normal cursor-pointer">
+                    Definir como Responsável Administrativo / Financeiro
+                  </Label>
                 </div>
 
                 <Button

@@ -59,19 +59,20 @@ export default function ApartamentosPage() {
   const updateMut = useUpdateApartamento();
   const deleteMut = useDeleteApartamento();
 
-  const proprietarioMap = useMemo(() => {
+  const moradorMap = useMemo(() => {
     const map: Record<string, string> = {};
     moradoresData?.items?.forEach((m) => { map[m.id] = m.nome; });
     return map;
   }, [moradoresData]);
 
-  // Enriquecer itens para ordenação por nome do proprietário
+  // Enriquecer itens para ordenação por nome do proprietário e responsável
   const formattedItems = useMemo(() => {
     return (data?.items || []).map((apto) => ({
       ...apto,
-      proprietario_nome: apto.proprietario_id ? proprietarioMap[apto.proprietario_id] || "" : "",
+      proprietario_nome: apto.proprietario_id ? (moradorMap[apto.proprietario_id] || apto.proprietario?.nome || "") : "",
+      responsavel_nome: apto.responsavel_id ? (moradorMap[apto.responsavel_id] || apto.responsavel?.nome || "") : "",
     }));
-  }, [data?.items, proprietarioMap]);
+  }, [data?.items, moradorMap]);
 
   const { items: sortedApartamentos, sortField, sortDirection, requestSort } = useSortableData(
     formattedItems,
@@ -110,7 +111,7 @@ export default function ApartamentosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Apartamentos</h1>
-          <p className="text-muted-foreground">Gerencie os apartamentos do condomínio</p>
+          <p className="text-muted-foreground">Gerencie os apartamentos, proprietários e responsáveis administrativos</p>
         </div>
         <Link href="/apartamentos/novo">
           <Button><Plus className="mr-2 h-4 w-4" /> Novo</Button>
@@ -165,6 +166,9 @@ export default function ApartamentosPage() {
                     <SortableHeader field="proprietario_nome" currentField={sortField as string} direction={sortDirection} onSort={requestSort}>
                       Proprietário
                     </SortableHeader>
+                    <SortableHeader field="responsavel_nome" currentField={sortField as string} direction={sortDirection} onSort={requestSort}>
+                      Resp. Administrativo
+                    </SortableHeader>
                     <SortableHeader field="status" currentField={sortField as string} direction={sortDirection} onSort={requestSort}>
                       Status
                     </SortableHeader>
@@ -177,7 +181,17 @@ export default function ApartamentosPage() {
                       <td className="p-3 font-medium">{apto.numero}</td>
                       <td className="p-3">{apto.bloco || "-"}</td>
                       <td className="p-3">{tipoLabel[apto.tipo] || apto.tipo}</td>
-                      <td className="p-3">{apto.proprietario_id ? (proprietarioMap[apto.proprietario_id] || "—") : "-"}</td>
+                      <td className="p-3">{apto.proprietario_nome || "—"}</td>
+                      <td className="p-3">
+                        {apto.responsavel_nome ? (
+                          <div className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
+                            <span>{apto.responsavel_nome}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic text-xs">Não definido</span>
+                        )}
+                      </td>
                       <td className="p-3">
                         <button
                           type="button"
@@ -207,7 +221,7 @@ export default function ApartamentosPage() {
                     </tr>
                   ))}
                   {data?.items.length === 0 && (
-                    <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Nenhum apartamento encontrado</td></tr>
+                    <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">Nenhum apartamento encontrado</td></tr>
                   )}
                 </tbody>
               </table>

@@ -308,7 +308,8 @@ async def seed_monazita():
                     fracao_ideal=apto_data["fracao_ideal"],
                     metragem=apto_data["metragem"],
                     status=apto_data["status"],
-                    proprietario_id=prop.id
+                    proprietario_id=prop.id,
+                    responsavel_id=prop.id
                 )
                 db.add(apto)
                 await db.flush()
@@ -318,6 +319,8 @@ async def seed_monazita():
                 apto.metragem = apto_data["metragem"]
                 apto.status = apto_data["status"]
                 apto.proprietario_id = prop.id
+                if not apto.responsavel_id:
+                    apto.responsavel_id = prop.id
 
             # Moradores
             for m_data in apto_data["moradores"]:

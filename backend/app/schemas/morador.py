@@ -10,6 +10,7 @@ class ApartamentoVinculoInfo(BaseModel):
     numero: str
     bloco: Optional[str] = None
     tipo_vinculo: str = "residente"  # "proprietario" ou "residente"
+    is_responsavel: bool = False
     data_inicio: Optional[date] = None
     data_fim: Optional[date] = None
 
@@ -25,6 +26,7 @@ class MoradorCreate(BaseModel):
     veiculo: Optional[str] = None
     tipo: TipoMorador = TipoMorador.morador
     apartamento_id: Optional[UUID] = None
+    definir_como_responsavel: Optional[bool] = False
 
     @field_validator("apartamento_id", mode="before")
     @classmethod
@@ -42,6 +44,7 @@ class MoradorUpdate(BaseModel):
     veiculo: Optional[str] = None
     tipo: Optional[TipoMorador] = None
     apartamento_id: Optional[UUID] = None
+    definir_como_responsavel: Optional[bool] = False
 
     @field_validator("apartamento_id", mode="before")
     @classmethod
@@ -70,27 +73,54 @@ class MoradorResponse(BaseModel):
     @classmethod
     def extract_relationships(cls, data: Any):
         if hasattr(data, "id") and hasattr(data, "nome"):
-            vinculos = []
+            vinculos_map = {}
+            responsavel_apto_ids = set()
+
+            if hasattr(data, "apartamentos_responsavel") and data.apartamentos_responsavel:
+                for apto in data.apartamentos_responsavel:
+                    responsavel_apto_ids.add(apto.id)
+
             if hasattr(data, "apartamentos_proprietario") and data.apartamentos_proprietario:
                 for apto in data.apartamentos_proprietario:
-                    vinculos.append({
+                    vinculos_map[apto.id] = {
                         "apartamento_id": apto.id,
                         "numero": apto.numero,
                         "bloco": apto.bloco,
                         "tipo_vinculo": "proprietario",
-                    })
+                        "is_responsavel": apto.id in responsavel_apto_ids or getattr(apto, "responsavel_id", None) == data.id,
+                    }
+
             if hasattr(data, "apartamentos") and data.apartamentos:
                 for am in data.apartamentos:
                     if getattr(am, "apartamento", None):
-                        if not any(v["apartamento_id"] == am.apartamento.id and v["tipo_vinculo"] == "proprietario" for v in vinculos):
-                            vinculos.append({
-                                "apartamento_id": am.apartamento.id,
-                                "numero": am.apartamento.numero,
-                                "bloco": am.apartamento.bloco,
+                        apto = am.apartamento
+                        if apto.id not in vinculos_map:
+                            vinculos_map[apto.id] = {
+                                "apartamento_id": apto.id,
+                                "numero": apto.numero,
+                                "bloco": apto.bloco,
                                 "tipo_vinculo": "residente",
+                                "is_responsavel": apto.id in responsavel_apto_ids or getattr(apto, "responsavel_id", None) == data.id,
                                 "data_inicio": am.data_inicio,
                                 "data_fim": am.data_fim,
-                            })
+                            }
+                        else:
+                            # Se já estava em vinculos como proprietário, garante que is_responsavel está atualizado
+                            if apto.id in responsavel_apto_ids or getattr(apto, "responsavel_id", None) == data.id:
+                                vinculos_map[apto.id]["is_responsavel"] = True
+
+            # Se morador é responsável por um apto mas não estava nem como dono nem na lista de residentes
+            if hasattr(data, "apartamentos_responsavel") and data.apartamentos_responsavel:
+                for apto in data.apartamentos_responsavel:
+                    if apto.id not in vinculos_map:
+                        vinculos_map[apto.id] = {
+                            "apartamento_id": apto.id,
+                            "numero": apto.numero,
+                            "bloco": apto.bloco,
+                            "tipo_vinculo": "residente",
+                            "is_responsavel": True,
+                        }
+
             return {
                 "id": data.id,
                 "nome": data.nome,
@@ -99,7 +129,7 @@ class MoradorResponse(BaseModel):
                 "email": data.email,
                 "veiculo": data.veiculo,
                 "tipo": data.tipo,
-                "apartamentos": vinculos,
+                "apartamentos": list(vinculos_map.values()),
                 "created_at": data.created_at,
                 "updated_at": data.updated_at,
             }
@@ -109,5 +139,6 @@ class MoradorResponse(BaseModel):
 class VincularApartamento(BaseModel):
     apartamento_id: UUID
     tipo_vinculo: Optional[str] = "residente"  # "proprietario" | "residente"
+    definir_como_responsavel: Optional[bool] = False
     data_inicio: Optional[date] = None
     data_fim: Optional[date] = None

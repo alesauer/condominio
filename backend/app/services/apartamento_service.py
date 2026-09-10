@@ -33,7 +33,10 @@ async def create_apartamento(db: AsyncSession, data: dict, usuario=None) -> Apar
 async def get_apartamento(db: AsyncSession, apartamento_id: str) -> Apartamento:
     result = await db.execute(
         select(Apartamento)
-        .options(selectinload(Apartamento.proprietario))
+        .options(
+            selectinload(Apartamento.proprietario),
+            selectinload(Apartamento.responsavel),
+        )
         .where(Apartamento.id == apartamento_id)
     )
     apto = result.scalar_one_or_none()
@@ -50,7 +53,10 @@ async def list_apartamentos(
     tipo: str = None,
     status: str = None,
 ):
-    query = select(Apartamento).options(selectinload(Apartamento.proprietario))
+    query = select(Apartamento).options(
+        selectinload(Apartamento.proprietario),
+        selectinload(Apartamento.responsavel),
+    )
     if search:
         query = query.where(
             or_(Apartamento.numero.ilike(f"%{search}%"), Apartamento.bloco.ilike(f"%{search}%"))

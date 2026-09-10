@@ -26,6 +26,7 @@ export default function NovoMoradorPage() {
     veiculo: "",
     tipo: "morador",
     apartamento_id: "",
+    definir_como_responsavel: false,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,6 +40,7 @@ export default function NovoMoradorPage() {
         veiculo: form.veiculo || null,
         tipo: form.tipo as any,
         apartamento_id: form.apartamento_id || null,
+        definir_como_responsavel: form.definir_como_responsavel,
       });
       toast.success("Cadastro realizado com sucesso!");
       router.push("/moradores");
@@ -173,6 +175,20 @@ export default function NovoMoradorPage() {
                   ))}
                 </SelectContent>
               </Select>
+              {form.apartamento_id && form.apartamento_id !== "none" && (
+                <div className="flex items-center space-x-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="definirComoRespNovo"
+                    checked={form.definir_como_responsavel}
+                    onChange={(e) => setForm({ ...form, definir_como_responsavel: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="definirComoRespNovo" className="text-xs font-normal cursor-pointer">
+                    Definir como Responsável Administrativo / Financeiro deste apartamento
+                  </Label>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {form.tipo === "proprietario"
                   ? "Ao vincular como proprietário, este morador será definido como o dono da unidade."

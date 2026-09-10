@@ -29,8 +29,10 @@ class Apartamento(Base, BaseModelMixin):
     vaga_demarcada = Column(String(50), nullable=True)
     status = Column(SQLEnum(StatusApartamento), nullable=False, default=StatusApartamento.vazio)
     proprietario_id = Column(UUID(as_uuid=True), ForeignKey("moradores.id", ondelete="SET NULL"), nullable=True, index=True)
+    responsavel_id = Column(UUID(as_uuid=True), ForeignKey("moradores.id", ondelete="SET NULL"), nullable=True, index=True)
 
     proprietario = relationship("Morador", back_populates="apartamentos_proprietario", foreign_keys=[proprietario_id])
+    responsavel = relationship("Morador", back_populates="apartamentos_responsavel", foreign_keys=[responsavel_id])
     moradores = relationship("ApartamentoMorador", back_populates="apartamento", cascade="all, delete-orphan")
     cobrancas = relationship("Cobranca", back_populates="apartamento", cascade="all, delete-orphan")
     leituras_gas = relationship("LeituraGas", back_populates="apartamento", cascade="all, delete-orphan")

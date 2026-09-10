@@ -27,3 +27,4 @@ class Morador(Base, BaseModelMixin):
     usuario = relationship("Usuario")
     apartamentos = relationship("ApartamentoMorador", back_populates="morador", cascade="all, delete-orphan")
     apartamentos_proprietario = relationship("Apartamento", back_populates="proprietario", foreign_keys="Apartamento.proprietario_id")
+    apartamentos_responsavel = relationship("Apartamento", back_populates="responsavel", foreign_keys="Apartamento.responsavel_id")
