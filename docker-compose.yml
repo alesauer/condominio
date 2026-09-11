@@ -59,6 +59,9 @@ services:
       - condo-net
     depends_on:
       - backend
+    command: >
+      sh -c "npm install &&
+             npm run dev"
 
 networks:
   condo-net:
