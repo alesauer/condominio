@@ -3,12 +3,26 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.permissions import admin_required
-from app.schemas.cobranca import CobrancaResponse, CobrancaGerarMensal, CobrancaGerarMensalResult, CobrancaPreviaResult
+from app.schemas.cobranca import (
+    CobrancaResponse,
+    CobrancaGerarMensal,
+    CobrancaGerarMensalResult,
+    CobrancaPreviaResult,
+    DemonstrativoMensalResponse,
+)
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
 from app.utils.pagination import paginate
 
 router = APIRouter()
+
+
+@router.get("/demonstrativo-mensal", response_model=DemonstrativoMensalResponse, dependencies=[Depends(admin_required)])
+async def obter_demonstrativo_mensal(
+    competencia: date = Query(..., description="Mês de competência (ex: 2026-09-01)"),
+    db: AsyncSession = Depends(get_db),
+):
+    return await cobranca_service.obter_demonstrativo_mensal(db, competencia=competencia)
 
 
 @router.get("", response_model=PaginatedResponse[CobrancaResponse], dependencies=[Depends(admin_required)])

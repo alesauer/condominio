@@ -13,6 +13,8 @@ from app.models.despesa_parcela import DespesaParcela
 from app.models.agua_rateio import AguaRateio
 from app.models.agua_rateio_apartamento import AguaRateioApartamento
 from app.models.leitura_gas import LeituraGas
+from app.models.aviso import Aviso
+from app.models.apartamento_morador import ApartamentoMorador
 from app.services.auditoria_service import registrar_auditoria
 
 
@@ -390,4 +392,329 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         "competencia": competencia,
         "cobrancas": cobrancas_recarregadas,
     }
+
+
+MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
+
+
+async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dict[str, Any]:
+    competencia = date(competencia.year, competencia.month, 1)
+    competencia_formatada = f"{MESES_PT[competencia.month - 1]}/{competencia.year}"
+
+    # 1. Apartamentos ordenados
+    aptos_res = await db.execute(
+        select(Apartamento)
+        .options(
+            selectinload(Apartamento.proprietario),
+            selectinload(Apartamento.responsavel),
+            selectinload(Apartamento.moradores).selectinload(ApartamentoMorador.morador),
+        )
+        .order_by(Apartamento.numero)
+    )
+    apartamentos = aptos_res.scalars().all()
+    if not apartamentos:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nenhum apartamento cadastrado")
+
+    fracoes_map = {}
+    responsaveis_map = {}
+    apartamentos_header = []
+
+    for apto in apartamentos:
+        f = Decimal(str(apto.fracao_ideal)) if apto.fracao_ideal and Decimal(str(apto.fracao_ideal)) > 0 else Decimal("0.142857")
+        fracoes_map[apto.id] = f
+
+        if apto.responsavel and apto.responsavel.nome:
+            resp_nome = apto.responsavel.nome
+        elif apto.proprietario and apto.proprietario.nome:
+            resp_nome = f"{apto.proprietario.nome} (PROPRIETÁRIO)"
+        elif apto.moradores:
+            nomes = [m.morador.nome for m in apto.moradores if m.morador and m.morador.nome]
+            resp_nome = " e ".join(nomes[:2]) if nomes else "Morador"
+        else:
+            resp_nome = "—"
+
+        responsaveis_map[apto.id] = resp_nome
+
+        apartamentos_header.append({
+            "id": apto.id,
+            "numero": apto.numero,
+            "bloco": apto.bloco,
+            "fracao_ideal": float(f),
+            "responsavel_nome": resp_nome,
+        })
+
+    soma_fracoes = sum(fracoes_map.values()) or Decimal("1.0")
+
+    # 2. Despesas do Mês
+    desp_unicas_res = await db.execute(
+        select(Despesa).where(
+            Despesa.competencia == competencia,
+            Despesa.parcelamento == False,
+            Despesa.status != StatusFinanceiro.cancelado,
+        ).order_by(Despesa.created_at)
+    )
+    despesas_unicas = desp_unicas_res.scalars().all()
+
+    parc_res = await db.execute(
+        select(DespesaParcela)
+        .options(selectinload(DespesaParcela.despesa))
+        .where(
+            DespesaParcela.competencia == competencia,
+            DespesaParcela.status != StatusFinanceiro.cancelado,
+        ).order_by(DespesaParcela.created_at)
+    )
+    parcelas = parc_res.scalars().all()
+
+    despesas_itens = []
+    total_despesas_por_apto = {apto.numero: Decimal("0.00") for apto in apartamentos}
+    total_despesas_mes = Decimal("0.00")
+
+    for d in despesas_unicas:
+        v = Decimal(str(d.valor))
+        total_despesas_mes += v
+        rateio = {}
+        soma_parcial = Decimal("0.00")
+        for apto in apartamentos:
+            v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            rateio[apto.numero] = float(v_apto)
+            total_despesas_por_apto[apto.numero] += v_apto
+            soma_parcial += v_apto
+        diff = v - soma_parcial
+        if diff != Decimal("0.00") and apartamentos:
+            maior = max(apartamentos, key=lambda a: fracoes_map[a.id])
+            rateio[maior.numero] = float(Decimal(str(rateio[maior.numero])) + diff)
+            total_despesas_por_apto[maior.numero] += diff
+
+        obs = d.observacao or ""
+        if not obs and d.vencimento:
+            obs = f"{d.vencimento.strftime('%d/%m/%Y')}"
+
+        despesas_itens.append({
+            "id": str(d.id),
+            "descricao": d.descricao,
+            "observacao": obs,
+            "valor": float(v),
+            "rateio_por_apto": rateio,
+        })
+
+    for p in parcelas:
+        v = Decimal(str(p.valor))
+        total_despesas_mes += v
+        desc = p.despesa.descricao if p.despesa else "Despesa Parcelada"
+        tot_parc = p.despesa.total_parcelas if p.despesa and p.despesa.total_parcelas else "?"
+        desc_full = f"{desc} ({p.numero_parcela}/{tot_parc})"
+        rateio = {}
+        soma_parcial = Decimal("0.00")
+        for apto in apartamentos:
+            v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            rateio[apto.numero] = float(v_apto)
+            total_despesas_por_apto[apto.numero] += v_apto
+            soma_parcial += v_apto
+        diff = v - soma_parcial
+        if diff != Decimal("0.00") and apartamentos:
+            maior = max(apartamentos, key=lambda a: fracoes_map[a.id])
+            rateio[maior.numero] = float(Decimal(str(rateio[maior.numero])) + diff)
+            total_despesas_por_apto[maior.numero] += diff
+
+        obs = p.observacao or (p.despesa.observacao if p.despesa else "") or ""
+        if not obs and p.vencimento:
+            obs = f"{p.vencimento.strftime('%d/%m/%Y')}"
+
+        despesas_itens.append({
+            "id": str(p.id),
+            "descricao": desc_full,
+            "observacao": obs,
+            "valor": float(v),
+            "rateio_por_apto": rateio,
+        })
+
+    # 3. Fundo de Reserva
+    cob_res = await db.execute(
+        select(Cobranca).where(Cobranca.competencia == competencia).order_by(Cobranca.vencimento)
+    )
+    cobrancas_existentes = cob_res.scalars().all()
+
+    valor_fundo_unitario = Decimal("250.00")
+    if cobrancas_existentes:
+        for c in cobrancas_existentes:
+            if "Fundo Reserva: R$" in c.descricao:
+                try:
+                    part = c.descricao.split("Fundo Reserva: R$")[1].split("|")[0].strip()
+                    valor_fundo_unitario = Decimal(part)
+                    break
+                except Exception:
+                    pass
+
+    total_fundo = valor_fundo_unitario * len(apartamentos)
+    fundo_rateio = {apto.numero: float(valor_fundo_unitario) for apto in apartamentos}
+    fundo_reserva_data = {
+        "descricao": f"Fundo de reserva/obras mensal fixo em R$ {valor_fundo_unitario:.2f}/apartamento",
+        "valor_unitario": float(valor_fundo_unitario),
+        "valor_total": float(total_fundo),
+        "rateio_por_apto": fundo_rateio,
+    }
+
+    # 4. Cobranças dos Moradores / Proprietários
+    cobrancas_moradores = []
+    total_cobrancas_mes = Decimal("0.00")
+    vencimento_padrao = None
+
+    cobrancas_por_apto = {c.apartamento_id: c for c in cobrancas_existentes}
+
+    if cobrancas_por_apto:
+        for apto in apartamentos:
+            c = cobrancas_por_apto.get(apto.id)
+            if c:
+                val = Decimal(str(c.valor_total if c.valor_total and c.valor_total > 0 else c.valor))
+                total_cobrancas_mes += val
+                if not vencimento_padrao:
+                    vencimento_padrao = c.vencimento
+                conf = c.data_pagamento.strftime('%d/%m/%Y') if (c.status == StatusFinanceiro.pago and c.data_pagamento) else ("Pago" if c.status == StatusFinanceiro.pago else "")
+                cobrancas_moradores.append({
+                    "apartamento_id": apto.id,
+                    "apartamento_numero": apto.numero,
+                    "responsavel_nome": responsaveis_map[apto.id],
+                    "valor_a_pagar": float(val),
+                    "vencimento": c.vencimento,
+                    "status": c.status.value if hasattr(c.status, "value") else str(c.status),
+                    "data_pagamento": c.data_pagamento,
+                    "confirmacao_pgto": conf,
+                })
+            else:
+                cobrancas_moradores.append({
+                    "apartamento_id": apto.id,
+                    "apartamento_numero": apto.numero,
+                    "responsavel_nome": responsaveis_map[apto.id],
+                    "valor_a_pagar": float(total_despesas_por_apto[apto.numero] + valor_fundo_unitario),
+                    "vencimento": date(competencia.year, competencia.month, 10),
+                    "status": "pendente",
+                    "data_pagamento": None,
+                    "confirmacao_pgto": "",
+                })
+    else:
+        calc = await _calcular_componentes_cobranca(
+            db,
+            competencia=competencia,
+            incluir_despesas=True,
+            incluir_agua=True,
+            incluir_gas=True,
+            valor_fundo_reserva=valor_fundo_unitario,
+        )
+        for apto in apartamentos:
+            apto_id = apto.id
+            val = (
+                calc["despesas_map"].get(apto_id, Decimal("0.00"))
+                + calc["agua_map"].get(apto_id, Decimal("0.00"))
+                + calc["gas_map"].get(apto_id, Decimal("0.00"))
+                + valor_fundo_unitario
+            )
+            total_cobrancas_mes += val
+            cobrancas_moradores.append({
+                "apartamento_id": apto_id,
+                "apartamento_numero": apto.numero,
+                "responsavel_nome": responsaveis_map.get(apto_id, "—"),
+                "valor_a_pagar": float(val),
+                "vencimento": vencimento_padrao,
+                "status": "pendente",
+                "data_pagamento": None,
+                "confirmacao_pgto": "",
+            })
+
+    # 5. Ações / Eventos Realizados no Mês
+    avisos_res = await db.execute(
+        select(Aviso)
+        .order_by(Aviso.data_publicacao.desc(), Aviso.created_at.desc())
+        .limit(10)
+    )
+    avisos = avisos_res.scalars().all()
+    acoes_eventos = []
+    for a in avisos:
+        acoes_eventos.append({
+            "id": str(a.id),
+            "titulo": a.titulo,
+            "descricao": a.descricao,
+            "data": a.data_publicacao,
+        })
+
+    # 6. Frações de Água (Agrupadas)
+    fracoes_agua = [
+        {
+            "descricao": "Fração Apto 101, 401 e 402",
+            "fracao": 0.171432,
+            "percentual_formatado": "0,171432 (17,1432%)",
+        },
+        {
+            "descricao": "Fração Apto 201, 202, 301, 302",
+            "fracao": 0.121426,
+            "percentual_formatado": "0,121426 (12,1426%)",
+        },
+    ]
+
+    # 7. Gás
+    gas_res = await db.execute(
+        select(LeituraGas).where(LeituraGas.competencia == competencia)
+    )
+    leituras_gas = gas_res.scalars().all()
+    leituras_map = {lg.apartamento_id: lg for lg in leituras_gas}
+
+    leituras_gas_itens = []
+    total_gas_m3 = Decimal("0.00")
+    total_gas_valor = Decimal("0.00")
+    preco_gas = Decimal("19.95")
+
+    for apto in apartamentos:
+        lg = leituras_map.get(apto.id)
+        if lg:
+            m3 = Decimal(str(lg.consumo or 0))
+            val = Decimal(str(lg.valor_cobrado or 0))
+            ant = Decimal(str(lg.leitura_anterior or 0))
+            atual = Decimal(str(lg.leitura_atual or 0))
+            if lg.valor_unitario:
+                preco_gas = Decimal(str(lg.valor_unitario))
+        else:
+            m3 = Decimal("0.00")
+            val = Decimal("0.00")
+            ant = Decimal("0.00")
+            atual = Decimal("0.00")
+
+        total_gas_m3 += m3
+        total_gas_valor += val
+
+        leituras_gas_itens.append({
+            "apartamento_numero": apto.numero,
+            "leitura_anterior": float(ant),
+            "leitura_atual": float(atual),
+            "m3_usado": float(m3),
+            "valor_a_pagar": float(val),
+        })
+
+    return {
+        "competencia": competencia,
+        "competencia_formatada": competencia_formatada,
+        "vencimento_padrao": vencimento_padrao or date(competencia.year, competencia.month, 10),
+        "apartamentos_header": apartamentos_header,
+        "despesas_itens": despesas_itens,
+        "total_despesas_mes": float(total_despesas_mes),
+        "total_despesas_por_apto": {k: float(v) for k, v in total_despesas_por_apto.items()},
+        "fundo_reserva": fundo_reserva_data,
+        "cobrancas_moradores": cobrancas_moradores,
+        "total_cobrancas_mes": float(total_cobrancas_mes),
+        "acoes_eventos": acoes_eventos,
+        "fracoes_agua": fracoes_agua,
+        "gas": {
+            "preco_m3": float(preco_gas),
+            "leituras": leituras_gas_itens,
+            "total_m3": float(total_gas_m3),
+            "total_valor": float(total_gas_valor),
+            "troca_gas": {
+                "ultima_troca": "08/2026",
+                "previsao_proxima_troca": "11/2026",
+                "observacao": "Quando necessário, será adquirido novo botijão de gás no valor de R$ 399,00, retirando do fundo e cobrado mensalmente das unidades consumidoras.",
+            },
+        },
+    }
+
 

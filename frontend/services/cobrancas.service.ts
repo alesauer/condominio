@@ -91,3 +91,102 @@ export function usePreviaCobrancasMensais() {
   });
 }
 
+export interface DemonstrativoApartamentoHeader {
+  id: string;
+  numero: string;
+  bloco: string | null;
+  fracao_ideal: number;
+  responsavel_nome: string;
+}
+
+export interface DemonstrativoDespesaItem {
+  id?: string;
+  descricao: string;
+  observacao: string;
+  valor: number;
+  rateio_por_apto: Record<string, number>;
+}
+
+export interface DemonstrativoFundoReserva {
+  descricao: string;
+  valor_unitario: number;
+  valor_total: number;
+  rateio_por_apto: Record<string, number>;
+}
+
+export interface DemonstrativoCobrancaApto {
+  apartamento_id: string;
+  apartamento_numero: string;
+  responsavel_nome: string;
+  valor_a_pagar: number;
+  vencimento: string;
+  status: string;
+  data_pagamento?: string | null;
+  confirmacao_pgto?: string;
+}
+
+export interface DemonstrativoAcaoEvento {
+  id?: string;
+  titulo: string;
+  descricao: string;
+  data?: string | null;
+}
+
+export interface DemonstrativoFracaoAgua {
+  descricao: string;
+  fracao: number;
+  percentual_formatado: string;
+}
+
+export interface DemonstrativoTrocaGas {
+  ultima_troca?: string;
+  previsao_proxima_troca?: string;
+  observacao?: string;
+}
+
+export interface DemonstrativoLeituraGasItem {
+  apartamento_numero: string;
+  leitura_anterior: number;
+  leitura_atual: number;
+  m3_usado: number;
+  valor_a_pagar: number;
+}
+
+export interface DemonstrativoGas {
+  preco_m3: number;
+  leituras: DemonstrativoLeituraGasItem[];
+  total_m3: number;
+  total_valor: number;
+  troca_gas: DemonstrativoTrocaGas;
+}
+
+export interface DemonstrativoMensalResponse {
+  competencia: string;
+  competencia_formatada: string;
+  vencimento_padrao?: string | null;
+  apartamentos_header: DemonstrativoApartamentoHeader[];
+  despesas_itens: DemonstrativoDespesaItem[];
+  total_despesas_mes: number;
+  total_despesas_por_apto: Record<string, number>;
+  fundo_reserva: DemonstrativoFundoReserva;
+  cobrancas_moradores: DemonstrativoCobrancaApto[];
+  total_cobrancas_mes: number;
+  acoes_eventos: DemonstrativoAcaoEvento[];
+  fracoes_agua: DemonstrativoFracaoAgua[];
+  gas: DemonstrativoGas;
+}
+
+export function useDemonstrativoMensal(competencia: string) {
+  return useQuery({
+    queryKey: [KEY, "demonstrativo-mensal", competencia],
+    queryFn: () =>
+      api
+        .get<DemonstrativoMensalResponse>("/cobrancas/demonstrativo-mensal", {
+          params: { competencia },
+        })
+        .then((r) => r.data),
+    enabled: !!competencia,
+  });
+}
+
+
