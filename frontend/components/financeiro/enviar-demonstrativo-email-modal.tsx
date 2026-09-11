@@ -83,7 +83,7 @@ export function EnviarDemonstrativoEmailModal({
     setDestinatarios((prev) =>
       prev.map((row) => ({
         ...row,
-        selected: select ? Boolean(row.email.trim()) : false,
+        selected: select,
       }))
     );
   };
@@ -91,7 +91,10 @@ export function EnviarDemonstrativoEmailModal({
   const handleToggleSelect = (index: number) => {
     setDestinatarios((prev) => {
       const next = [...prev];
-      next[index].selected = !next[index].selected;
+      next[index] = {
+        ...next[index],
+        selected: !next[index].selected,
+      };
       return next;
     });
   };
@@ -99,18 +102,21 @@ export function EnviarDemonstrativoEmailModal({
   const handleEmailChange = (index: number, newEmail: string) => {
     setDestinatarios((prev) => {
       const next = [...prev];
-      next[index].email = newEmail;
-      if (newEmail.trim() && !next[index].selected) {
-        next[index].selected = true;
-      } else if (!newEmail.trim()) {
-        next[index].selected = false;
-      }
+      next[index] = {
+        ...next[index],
+        email: newEmail,
+        selected: newEmail.trim() ? true : next[index].selected,
+      };
       return next;
     });
   };
 
   const validSelectedCount = useMemo(() => {
     return destinatarios.filter((d) => d.selected && d.email.trim()).length;
+  }, [destinatarios]);
+
+  const totalSelectedCount = useMemo(() => {
+    return destinatarios.filter((d) => d.selected).length;
   }, [destinatarios]);
 
   const handleEnviar = async () => {
@@ -258,41 +264,50 @@ export function EnviarDemonstrativoEmailModal({
               {destinatarios.map((row, idx) => (
                 <div
                   key={row.apartamentoNumero}
-                  className={`p-2 rounded-md border transition-colors flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs ${
+                  onClick={() => handleToggleSelect(idx)}
+                  className={`p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${
                     row.selected
-                      ? "bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/40"
-                      : "bg-muted/10 border-border opacity-70"
+                      ? "bg-indigo-50/70 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-800 shadow-xs"
+                      : "bg-muted/10 border-border/70 hover:bg-muted/30 opacity-70"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-[180px]">
+                  <div className="flex items-center gap-2.5 min-w-[190px] select-none">
                     <Checkbox
                       checked={row.selected}
-                      disabled={!row.email.trim()}
                       onCheckedChange={() => handleToggleSelect(idx)}
                       id={`chk-${row.apartamentoNumero}`}
                     />
                     <div>
-                      <label
-                        htmlFor={`chk-${row.apartamentoNumero}`}
-                        className="font-bold text-foreground cursor-pointer block"
-                      >
+                      <span className="font-bold text-foreground block">
                         Apto {row.apartamentoNumero}
                         {row.bloco ? ` - ${row.bloco}` : ""}
-                      </label>
-                      <span className="text-[11px] text-muted-foreground block truncate max-w-[160px]">
-                        {row.responsavelNome}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground block truncate max-w-[170px]">
+                        {row.responsavelNome || "Sem responsável cadastrado"}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex-1 w-full sm:w-auto">
+                  <div
+                    className="flex-1 w-full sm:w-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Input
                       type="email"
                       placeholder="Adicionar e-mail do responsável..."
-                      className="h-7 text-xs"
+                      className={`h-8 text-xs transition-colors ${
+                        row.selected && !row.email.trim()
+                          ? "border-amber-400 focus-visible:ring-amber-400 bg-amber-50/20"
+                          : ""
+                      }`}
                       value={row.email}
                       onChange={(e) => handleEmailChange(idx, e.target.value)}
                     />
+                    {row.selected && !row.email.trim() && (
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium block mt-0.5">
+                        ⚠️ Preencha o e-mail para que esta unidade receba o demonstrativo.
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
