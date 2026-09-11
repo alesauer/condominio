@@ -17,6 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 0. Ensure columns in moradores
+    op.execute("ALTER TABLE moradores ADD COLUMN IF NOT EXISTS usuario_id UUID REFERENCES usuarios(id) ON DELETE SET NULL;")
+    op.execute("ALTER TABLE moradores ADD COLUMN IF NOT EXISTS veiculo VARCHAR(100);")
+
     # 1. Add 'proprietario' to tipomorador enum in PostgreSQL (must commit before use)
     with op.get_context().autocommit_block():
         op.execute("ALTER TYPE tipomorador ADD VALUE IF NOT EXISTS 'proprietario'")
