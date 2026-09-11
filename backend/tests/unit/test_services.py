@@ -32,9 +32,16 @@ def make_mock_result(scalar_one_or_none_return=None, scalars_all_return=None, sc
     result = MagicMock()  # Use MagicMock NOT AsyncMock — scalar_one_or_none is sync
     result.scalar_one_or_none.return_value = scalar_one_or_none_return
     result.scalar.return_value = scalar_return
+    result.scalars.return_value.first.return_value = scalar_one_or_none_return
     if scalars_all_return is not None:
         result.scalars.return_value.all.return_value = scalars_all_return
+        if scalars_all_return:
+            result.scalars.return_value.first.return_value = scalars_all_return[0]
+        else:
+            result.scalars.return_value.first.return_value = None
     return result
+
+
 
 
 

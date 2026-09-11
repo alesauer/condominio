@@ -13,7 +13,7 @@ from app.models.despesa_parcela import DespesaParcela
 from app.models.agua_rateio import AguaRateio
 from app.models.agua_rateio_apartamento import AguaRateioApartamento
 from app.models.leitura_gas import LeituraGas
-from app.models.aviso import Aviso
+from app.models.aviso import Aviso, PrioridadeAviso
 from app.models.troca_gas_config import TrocaGasConfig
 from app.models.demonstrativo_config import DemonstrativoConfig
 from app.models.apartamento_morador import ApartamentoMorador
@@ -86,15 +86,51 @@ async def pagar_cobranca(db: AsyncSession, cobranca_id: str, usuario=None) -> Co
     return cob
 
 
+MESES_PT = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+]
+
+
+def _parse_competencia(comp: Any) -> date:
+    if isinstance(comp, date):
+        return date(comp.year, comp.month, 1)
+    if isinstance(comp, str):
+        comp = comp.strip()
+        if len(comp) == 7 and "-" in comp:
+            parts = comp.split("-")
+            return date(int(parts[0]), int(parts[1]), 1)
+        from datetime import datetime
+        try:
+            dt = datetime.strptime(comp[:10], "%Y-%m-%d").date()
+            return date(dt.year, dt.month, 1)
+        except Exception:
+            pass
+    return date.today().replace(day=1)
+
+
+def _parse_date(d: Any) -> date:
+    if isinstance(d, date):
+        return d
+    if isinstance(d, str):
+        from datetime import datetime
+        try:
+            return datetime.strptime(d.strip()[:10], "%Y-%m-%d").date()
+        except Exception:
+            pass
+    return date.today()
+
+
 async def _calcular_componentes_cobranca(
     db: AsyncSession,
-    competencia: date,
+    competencia: Any,
     incluir_despesas: bool = True,
     incluir_agua: bool = True,
     incluir_gas: bool = True,
     valor_fundo_reserva: Decimal = Decimal("0.00"),
     valor_base_condominio: Optional[Decimal] = None,
 ) -> Dict[str, Any]:
+    competencia = _parse_competencia(competencia)
     if valor_base_condominio is not None and valor_fundo_reserva == Decimal("0.00"):
         valor_fundo_reserva = valor_base_condominio
 
@@ -111,9 +147,11 @@ async def _calcular_componentes_cobranca(
         if apto.fracao_ideal is not None and Decimal(str(apto.fracao_ideal)) > 0:
             fracoes_map[apto.id] = Decimal(str(apto.fracao_ideal))
         else:
-            fracoes_map[apto.id] = Decimal("1.0")
+            fracoes_map[apto.id] = (Decimal("1.0") / Decimal(str(len(apartamentos)))).quantize(Decimal("0.000001"))
 
-    soma_fracoes = sum(fracoes_map.values()) or Decimal("1.0")
+    soma_fracoes = sum(fracoes_map.values())
+    if soma_fracoes <= Decimal("0.00"):
+        soma_fracoes = Decimal("1.0")
 
     # 2. Despesas do Mês
     despesas_map: Dict[Any, Decimal] = {apto.id: Decimal("0.00") for apto in apartamentos}
@@ -147,8 +185,10 @@ async def _calcular_componentes_cobranca(
         for d in despesas_unicas:
             v = Decimal(str(d.valor))
             total_despesas_mes += v
-            desc_lower = d.descricao.lower()
-            cat_lower = (d.categoria or "").lower()
+            desc = d.descricao or ""
+            desc_lower = desc.lower()
+            cat = d.categoria or ""
+            cat_lower = cat.lower()
             is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
 
             soma_parcial = Decimal("0.00")
@@ -162,16 +202,17 @@ async def _calcular_componentes_cobranca(
 
             diff = v - soma_parcial
             if diff != Decimal("0.00") and apartamentos:
-                maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
+                maior = max(apartamentos, key=lambda a: fracoes_map.get(a.id, Decimal("0.0"))) if is_agua else apartamentos[0]
                 despesas_map[maior.id] += diff
 
         # Process parcelas: fraction only for water/copasa, equal for other expenses
         for p in parcelas:
             v = Decimal(str(p.valor))
             total_despesas_mes += v
-            desc = p.despesa.descricao if p.despesa else "Despesa Parcelada"
+            desc = p.despesa.descricao if p.despesa and p.despesa.descricao else "Despesa Parcelada"
             desc_lower = desc.lower()
-            cat_lower = (p.despesa.categoria if p.despesa and p.despesa.categoria else "").lower()
+            cat = p.despesa.categoria if p.despesa and p.despesa.categoria else ""
+            cat_lower = cat.lower()
             is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
 
             soma_parcial = Decimal("0.00")
@@ -185,7 +226,7 @@ async def _calcular_componentes_cobranca(
 
             diff = v - soma_parcial
             if diff != Decimal("0.00") and apartamentos:
-                maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
+                maior = max(apartamentos, key=lambda a: fracoes_map.get(a.id, Decimal("0.0"))) if is_agua else apartamentos[0]
                 despesas_map[maior.id] += diff
 
     # 3. Rateio de Água
@@ -196,7 +237,7 @@ async def _calcular_componentes_cobranca(
         rateio_result = await db.execute(
             select(AguaRateio).where(AguaRateio.competencia == competencia)
         )
-        rateio_agua = rateio_result.scalar_one_or_none()
+        rateio_agua = rateio_result.scalars().first()
         if rateio_agua:
             detalhes_result = await db.execute(
                 select(AguaRateioApartamento).where(AguaRateioApartamento.rateio_id == rateio_agua.id)
@@ -218,7 +259,8 @@ async def _calcular_componentes_cobranca(
             val = lg.valor_cobrado if lg.valor_cobrado is not None else Decimal("0.00")
             if val:
                 val_dec = Decimal(str(val))
-                gas_map[lg.apartamento_id] = val_dec
+                if lg.apartamento_id in gas_map:
+                    gas_map[lg.apartamento_id] = val_dec
                 total_gas += val_dec
 
     total_fundo = valor_fundo_reserva * len(apartamentos)
@@ -241,8 +283,8 @@ async def _calcular_componentes_cobranca(
 
 
 async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, Any]:
-    competencia: date = data["competencia"]
-    vencimento: date = data["vencimento"]
+    competencia = _parse_competencia(data["competencia"])
+    vencimento = _parse_date(data["vencimento"])
     valor_fundo = Decimal(str(data.get("valor_fundo_reserva") or data.get("valor_base_condominio") or 0))
     incluir_despesas: bool = data.get("incluir_despesas", True)
     incluir_agua: bool = data.get("incluir_agua", True)
@@ -285,7 +327,7 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
             "apartamento_numero": apto.numero,
             "apartamento_bloco": apto.bloco,
             "apartamento_tipo": tipo_str,
-            "fracao_ideal": float(fracoes_map[apto.id]),
+            "fracao_ideal": float(fracoes_map.get(apto.id, Decimal("0.0"))),
             "valor_despesas": float(v_desp),
             "valor_agua": float(v_agua),
             "valor_gas": float(v_gas),
@@ -309,8 +351,8 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
 
 
 async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) -> Dict[str, Any]:
-    competencia: date = data["competencia"]
-    vencimento: date = data["vencimento"]
+    competencia = _parse_competencia(data["competencia"])
+    vencimento = _parse_date(data["vencimento"])
     valor_fundo = Decimal(str(data.get("valor_fundo_reserva") or data.get("valor_base_condominio") or 0))
     incluir_despesas: bool = data.get("incluir_despesas", True)
     incluir_agua: bool = data.get("incluir_agua", True)
@@ -386,44 +428,34 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
 
     # Salva ações e eventos informados para o mês
     acoes_input = data.get("acoes_eventos") or []
-    for acao in acoes_input:
-        if isinstance(acao, dict):
-            t = acao.get("titulo")
-            d = acao.get("descricao")
-            dt = acao.get("data") or competencia
-        else:
-            t = getattr(acao, "titulo", None)
-            d = getattr(acao, "descricao", None)
-            dt = getattr(acao, "data", None) or competencia
-
-        if t and d:
-            aviso = Aviso(
-                titulo=t,
-                descricao=d,
-                data_publicacao=dt,
-                prioridade="baixa",
-            )
-            db.add(aviso)
+    if acoes_input:
+        try:
+            await salvar_acoes_eventos(db, competencia=competencia, acoes_eventos=acoes_input, usuario=usuario)
+        except Exception:
+            pass
 
     await db.flush()
 
-    await registrar_auditoria(
-        db,
-        acao="GERAR_COBRANCAS_LOTE",
-        entidade_tipo="cobrancas",
-        dados_novos={
-            "competencia": str(competencia),
-            "vencimento": str(vencimento),
-            "geradas": len(geradas),
-            "total_valor": float(total_valor),
-            "total_despesas_mes": float(calc["total_despesas_mes"]),
-            "total_agua": float(calc["total_agua"]),
-            "total_gas": float(calc["total_gas"]),
-            "total_fundo_reserva": float(calc["total_fundo_reserva"]),
-            "acoes_eventos_count": len(acoes_input),
-        },
-        usuario=usuario,
-    )
+    try:
+        await registrar_auditoria(
+            db,
+            acao="GERAR_COBRANCAS_LOTE",
+            entidade_tipo="cobrancas",
+            dados_novos={
+                "competencia": str(competencia),
+                "vencimento": str(vencimento),
+                "geradas": len(geradas),
+                "total_valor": float(total_valor),
+                "total_despesas_mes": float(calc["total_despesas_mes"]),
+                "total_agua": float(calc["total_agua"]),
+                "total_gas": float(calc["total_gas"]),
+                "total_fundo_reserva": float(calc["total_fundo_reserva"]),
+                "acoes_eventos_count": len(acoes_input),
+            },
+            usuario=usuario,
+        )
+    except Exception:
+        pass
 
     await db.commit()
 
@@ -451,28 +483,6 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         "cobrancas": cobrancas_recarregadas,
     }
 
-
-MESES_PT = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-]
-
-
-def _parse_competencia(comp: Any) -> date:
-    if isinstance(comp, date):
-        return date(comp.year, comp.month, 1)
-    if isinstance(comp, str):
-        comp = comp.strip()
-        if len(comp) == 7 and "-" in comp:
-            parts = comp.split("-")
-            return date(int(parts[0]), int(parts[1]), 1)
-        from datetime import datetime
-        try:
-            dt = datetime.strptime(comp, "%Y-%m-%d").date()
-            return date(dt.year, dt.month, 1)
-        except Exception:
-            pass
-    return date.today().replace(day=1)
 
 
 async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict[str, Any]:
@@ -644,10 +654,11 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
         for c in cobrancas_existentes:
             if "Fundo Reserva: R$" in c.descricao:
                 try:
-                    part = c.descricao.split("Fundo Reserva: R$")[1].split("|")[0].strip()
+                    part = c.descricao.split("Fundo Reserva: R$")[1].split("|")[0].replace(")", "").strip()
                     valor_fundo_unitario = Decimal(part)
                     break
                 except Exception:
+                    pass
                     pass
 
     total_fundo = valor_fundo_unitario * len(apartamentos)
@@ -964,20 +975,22 @@ async def salvar_acoes_eventos(db: AsyncSession, competencia: Any, acoes_eventos
             item_id = item.get("id")
             t = (item.get("titulo") or "").strip()
             d = (item.get("descricao") or "").strip()
-            dt = item.get("data") or comp_date
+            dt = _parse_date(item.get("data") or comp_date)
         else:
             item_id = getattr(item, "id", None)
             t = (getattr(item, "titulo", None) or "").strip()
             d = (getattr(item, "descricao", None) or "").strip()
-            dt = getattr(item, "data", None) or competencia
+            dt = _parse_date(getattr(item, "data", None) or comp_date)
 
         if not t or not d:
             continue
 
         if item_id:
             try:
-                res = await db.execute(select(Aviso).where(Aviso.id == item_id))
-                aviso = res.scalar_one_or_none()
+                import uuid
+                item_uuid = uuid.UUID(str(item_id)) if not isinstance(item_id, uuid.UUID) else item_id
+                res = await db.execute(select(Aviso).where(Aviso.id == item_uuid))
+                aviso = res.scalars().first()
                 if aviso:
                     aviso.titulo = t
                     aviso.descricao = d
@@ -991,11 +1004,12 @@ async def salvar_acoes_eventos(db: AsyncSession, competencia: Any, acoes_eventos
             titulo=t,
             descricao=d,
             data_publicacao=dt,
-            prioridade="baixa",
+            prioridade=PrioridadeAviso.baixa,
         )
         db.add(novo_aviso)
         salvos.append(novo_aviso)
 
+    await db.flush()
     await db.commit()
     for a in salvos:
         await db.refresh(a)
@@ -1012,12 +1026,18 @@ async def salvar_acoes_eventos(db: AsyncSession, competencia: Any, acoes_eventos
 
 
 async def delete_acao_evento(db: AsyncSession, aviso_id: str, usuario=None) -> None:
-    res = await db.execute(select(Aviso).where(Aviso.id == aviso_id))
-    aviso = res.scalar_one_or_none()
+    try:
+        import uuid
+        uid = uuid.UUID(str(aviso_id)) if not isinstance(aviso_id, uuid.UUID) else aviso_id
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID inválido")
+    res = await db.execute(select(Aviso).where(Aviso.id == uid))
+    aviso = res.scalars().first()
     if not aviso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ação/Evento não encontrado")
     await db.delete(aviso)
     await db.commit()
+
 
 
 async def enviar_email_demonstrativo(db: AsyncSession, data: Any, usuario=None) -> Dict[str, Any]:

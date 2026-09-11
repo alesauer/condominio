@@ -30,32 +30,43 @@ async def registrar_auditoria(
     dados_novos: Optional[Dict[str, Any]] = None,
     usuario: Optional[Usuario] = None,
     ip_origem: Optional[str] = None,
-) -> Auditoria:
+) -> Optional[Auditoria]:
     """
-    Registra um log de auditoria no sistema.
+    Registra um log de auditoria no sistema de forma segura.
     """
-    uid = None
-    if entidade_id:
-        if isinstance(entidade_id, uuid.UUID):
-            uid = entidade_id
-        else:
-            try:
-                uid = uuid.UUID(str(entidade_id))
-            except (ValueError, TypeError):
-                uid = None
+    try:
+        uid = None
+        if entidade_id:
+            if isinstance(entidade_id, uuid.UUID):
+                uid = entidade_id
+            else:
+                try:
+                    uid = uuid.UUID(str(entidade_id))
+                except (ValueError, TypeError):
+                    uid = None
 
-    usuario_id = usuario.id if usuario else None
-    usuario_nome = usuario.nome if usuario else "Sistema"
+        usuario_id = getattr(usuario, "id", None) if usuario else None
+        usuario_nome = getattr(usuario, "nome", "Sistema") if usuario else "Sistema"
 
-    log = Auditoria(
-        usuario_id=usuario_id,
-        usuario_nome=usuario_nome,
-        acao=acao,
-        entidade_tipo=entidade_tipo,
-        entidade_id=uid,
-        dados_anteriores=_sanitize_json(dados_anteriores),
-        dados_novos=_sanitize_json(dados_novos),
-        ip_origem=ip_origem,
-    )
-    db.add(log)
-    return log
+        if usuario_id:
+            if not isinstance(usuario_id, uuid.UUID):
+                try:
+                    usuario_id = uuid.UUID(str(usuario_id))
+                except (ValueError, TypeError):
+                    usuario_id = None
+
+        log = Auditoria(
+            usuario_id=usuario_id,
+            usuario_nome=usuario_nome,
+            acao=acao,
+            entidade_tipo=entidade_tipo,
+            entidade_id=uid,
+            dados_anteriores=_sanitize_json(dados_anteriores),
+            dados_novos=_sanitize_json(dados_novos),
+            ip_origem=ip_origem,
+        )
+        db.add(log)
+        return log
+    except Exception:
+        return None
+
