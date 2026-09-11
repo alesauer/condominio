@@ -309,7 +309,7 @@ export default function EditApartamentoPage() {
                     <Input
                       id="fracao_ideal"
                       type="number"
-                      step="0.0001"
+                      step="0.000001"
                       value={form.fracao_ideal}
                       onChange={(e) => setForm({ ...form, fracao_ideal: e.target.value })}
                     />

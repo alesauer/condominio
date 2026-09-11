@@ -329,7 +329,7 @@ export default function CobrancasPage() {
                                 )}
                               </td>
                               <td className="p-1.5 text-right text-muted-foreground">
-                                {(a.fracao_ideal * 100).toFixed(2).replace(".", ",")}%
+                                {(a.fracao_ideal * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}%
                               </td>
                               {formGerar.incluir_despesas && (
                                 <td className="p-1.5 text-right">{formatCurrency(a.valor_despesas)}</td>

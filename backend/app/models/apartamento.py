@@ -24,7 +24,7 @@ class Apartamento(Base, BaseModelMixin):
     numero = Column(String(20), nullable=False)
     bloco = Column(String(20), nullable=True)
     tipo = Column(SQLEnum(TipoApartamento), nullable=False, default=TipoApartamento.padrao)
-    fracao_ideal = Column(Numeric(8, 4), nullable=True)
+    fracao_ideal = Column(Numeric(10, 6), nullable=True)
     metragem = Column(Numeric(8, 2), nullable=True)
     vaga_demarcada = Column(String(50), nullable=True)
     status = Column(SQLEnum(StatusApartamento), nullable=False, default=StatusApartamento.vazio)

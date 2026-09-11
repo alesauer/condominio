@@ -107,10 +107,11 @@ export default function RateioDetailPage() {
               const displayApto = a.apartamento_numero
                 ? `Apto ${a.apartamento_numero}${a.apartamento_bloco ? ` - ${a.apartamento_bloco}` : ""}`
                 : a.apartamento_id;
+              const fracaoVal = a.fracao_ideal !== undefined && a.fracao_ideal !== null ? a.fracao_ideal : a.peso;
               const fracaoPct =
-                a.fracao_ideal !== undefined && a.fracao_ideal !== null
-                  ? `${(Number(a.fracao_ideal) * 100).toFixed(2).replace(".", ",")}%`
-                  : `${(Number(a.peso) * 100).toFixed(2).replace(".", ",")}%`;
+                fracaoVal !== undefined && fracaoVal !== null
+                  ? `${(Number(fracaoVal) * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 4 })}%`
+                  : "-";
 
               return (
                 <tr key={a.id || a.apartamento_id} className="border-b hover:bg-muted/30">

@@ -188,8 +188,8 @@ export default function NovoApartamentoPage() {
                 <Input
                   id="fracao_ideal"
                   type="number"
-                  step="0.0001"
-                  placeholder="Ex: 0.1250"
+                  step="0.000001"
+                  placeholder="Ex: 0.121426"
                   value={form.fracao_ideal}
                   onChange={(e) => setForm({ ...form, fracao_ideal: e.target.value })}
                 />

@@ -11,8 +11,8 @@ class AguaRateioApartamento(Base, BaseModelMixin):
 
     rateio_id = Column(UUID(as_uuid=True), ForeignKey("agua_rateios.id", ondelete="CASCADE"), nullable=False, index=True)
     apartamento_id = Column(UUID(as_uuid=True), ForeignKey("apartamentos.id", ondelete="CASCADE"), nullable=False, index=True)
-    peso = Column(Numeric(8, 4), nullable=False)
-    soma_pesos = Column(Numeric(10, 4), nullable=False)
+    peso = Column(Numeric(10, 6), nullable=False)
+    soma_pesos = Column(Numeric(12, 6), nullable=False)
     valor_calculado = Column(Numeric(12, 2), nullable=False)
 
     rateio = relationship("AguaRateio", back_populates="apartamentos")

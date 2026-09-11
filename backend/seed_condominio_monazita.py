@@ -25,7 +25,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "101",
         "tipo": TipoApartamento.area_privativa,
-        "fracao_ideal": 0.1666,
+        "fracao_ideal": 0.171432,
         "metragem": 95.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
@@ -54,7 +54,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "201",
         "tipo": TipoApartamento.padrao,
-        "fracao_ideal": 0.1250,
+        "fracao_ideal": 0.121426,
         "metragem": 75.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
@@ -83,7 +83,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "202",
         "tipo": TipoApartamento.padrao,
-        "fracao_ideal": 0.1250,
+        "fracao_ideal": 0.121426,
         "metragem": 75.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
@@ -112,7 +112,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "301",
         "tipo": TipoApartamento.padrao,
-        "fracao_ideal": 0.1250,
+        "fracao_ideal": 0.121426,
         "metragem": 75.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
@@ -141,7 +141,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "302",
         "tipo": TipoApartamento.padrao,
-        "fracao_ideal": 0.1250,
+        "fracao_ideal": 0.121426,
         "metragem": 75.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
@@ -163,7 +163,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "401",
         "tipo": TipoApartamento.cobertura,
-        "fracao_ideal": 0.1667,
+        "fracao_ideal": 0.171432,
         "metragem": 130.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
@@ -192,7 +192,7 @@ DADOS_APARTAMENTOS = [
     {
         "numero": "402",
         "tipo": TipoApartamento.cobertura,
-        "fracao_ideal": 0.1667,
+        "fracao_ideal": 0.171432,
         "metragem": 130.0,
         "status": StatusApartamento.ocupado,
         "proprietario": {
