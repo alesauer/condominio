@@ -264,7 +264,7 @@ export function DemonstrativoMensalSheet({
             onClick={handleExportPDF}
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
           >
-            <FileDown className="h-4 w-4 mr-1.5" /> Salvar PDF Profissional
+            <FileDown className="h-4 w-4 mr-1.5" /> Salvar PDF
           </Button>
         </div>
       </div>
