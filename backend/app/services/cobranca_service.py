@@ -14,6 +14,7 @@ from app.models.agua_rateio import AguaRateio
 from app.models.agua_rateio_apartamento import AguaRateioApartamento
 from app.models.leitura_gas import LeituraGas
 from app.models.aviso import Aviso
+from app.models.troca_gas_config import TrocaGasConfig
 from app.models.apartamento_morador import ApartamentoMorador
 from app.services.auditoria_service import registrar_auditoria
 
@@ -455,8 +456,25 @@ MESES_PT = [
 ]
 
 
-async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dict[str, Any]:
-    competencia = date(competencia.year, competencia.month, 1)
+def _parse_competencia(comp: Any) -> date:
+    if isinstance(comp, date):
+        return date(comp.year, comp.month, 1)
+    if isinstance(comp, str):
+        comp = comp.strip()
+        if len(comp) == 7 and "-" in comp:
+            parts = comp.split("-")
+            return date(int(parts[0]), int(parts[1]), 1)
+        from datetime import datetime
+        try:
+            dt = datetime.strptime(comp, "%Y-%m-%d").date()
+            return date(dt.year, dt.month, 1)
+        except Exception:
+            pass
+    return date.today().replace(day=1)
+
+
+async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict[str, Any]:
+    competencia = _parse_competencia(competencia)
     competencia_formatada = f"{MESES_PT[competencia.month - 1]}/{competencia.year}"
 
     # 1. Apartamentos ordenados
@@ -779,6 +797,24 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dic
             "valor_a_pagar": float(val),
         })
 
+    # Consulta configuração de troca de gás para a competência ou global
+    troca_gas_res = await db.execute(
+        select(TrocaGasConfig)
+        .where(
+            (TrocaGasConfig.competencia == competencia) | (TrocaGasConfig.competencia.is_(None))
+        )
+        .order_by(TrocaGasConfig.competencia.desc().nullslast(), TrocaGasConfig.updated_at.desc())
+    )
+    troca_gas_cfg = troca_gas_res.scalars().first()
+
+    ultima_troca = troca_gas_cfg.ultima_troca if (troca_gas_cfg and troca_gas_cfg.ultima_troca) else "08/2026"
+    previsao_proxima = troca_gas_cfg.previsao_proxima_troca if (troca_gas_cfg and troca_gas_cfg.previsao_proxima_troca) else "11/2026"
+    obs_troca = (
+        troca_gas_cfg.observacao
+        if (troca_gas_cfg and troca_gas_cfg.observacao)
+        else "Quando necessário, será adquirido novo botijão de gás no valor de R$ 399,00, retirando do fundo e cobrado mensalmente das unidades consumidoras."
+    )
+
     return {
         "competencia": competencia,
         "competencia_formatada": competencia_formatada,
@@ -798,22 +834,67 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dic
             "total_m3": float(total_gas_m3),
             "total_valor": float(total_gas_valor),
             "troca_gas": {
-                "ultima_troca": "08/2026",
-                "previsao_proxima_troca": "11/2026",
-                "observacao": "Quando necessário, será adquirido novo botijão de gás no valor de R$ 399,00, retirando do fundo e cobrado mensalmente das unidades consumidoras.",
+                "ultima_troca": ultima_troca,
+                "previsao_proxima_troca": previsao_proxima,
+                "observacao": obs_troca,
             },
         },
     }
 
 
-async def salvar_acoes_eventos(db: AsyncSession, competencia: date, acoes_eventos: List[Any], usuario=None) -> List[Dict[str, Any]]:
+async def salvar_troca_gas_config(db: AsyncSession, data: Any, usuario=None) -> Dict[str, Any]:
+    if hasattr(data, "model_dump"):
+        data_dict = data.model_dump()
+    elif isinstance(data, dict):
+        data_dict = data
+    else:
+        data_dict = vars(data)
+
+    comp = data_dict.get("competencia")
+    if comp:
+        comp = _parse_competencia(comp)
+
+    query = select(TrocaGasConfig)
+    if comp:
+        query = query.where(TrocaGasConfig.competencia == comp)
+    else:
+        query = query.where(TrocaGasConfig.competencia.is_(None))
+
+    res = await db.execute(query)
+    cfg = res.scalar_one_or_none()
+
+    if not cfg:
+        cfg = TrocaGasConfig(competencia=comp)
+        db.add(cfg)
+
+    if "ultima_troca" in data_dict and data_dict["ultima_troca"] is not None:
+        cfg.ultima_troca = str(data_dict["ultima_troca"]).strip()
+    if "previsao_proxima_troca" in data_dict and data_dict["previsao_proxima_troca"] is not None:
+        cfg.previsao_proxima_troca = str(data_dict["previsao_proxima_troca"]).strip()
+    if "observacao" in data_dict and data_dict["observacao"] is not None:
+        cfg.observacao = str(data_dict["observacao"]).strip()
+
+    await db.commit()
+    await db.refresh(cfg)
+
+    return {
+        "ultima_troca": cfg.ultima_troca or "08/2026",
+        "previsao_proxima_troca": cfg.previsao_proxima_troca or "11/2026",
+        "observacao": cfg.observacao or "Quando necessário, será adquirido novo botijão de gás no valor de R$ 399,00, retirando do fundo e cobrado mensalmente das unidades consumidoras.",
+    }
+
+
+async def salvar_acoes_eventos(db: AsyncSession, competencia: Any, acoes_eventos: List[Any], usuario=None) -> List[Dict[str, Any]]:
+    comp_date = _parse_competencia(competencia)
     salvos = []
     for item in acoes_eventos:
+        if hasattr(item, "model_dump"):
+            item = item.model_dump()
         if isinstance(item, dict):
             item_id = item.get("id")
             t = (item.get("titulo") or "").strip()
             d = (item.get("descricao") or "").strip()
-            dt = item.get("data") or competencia
+            dt = item.get("data") or comp_date
         else:
             item_id = getattr(item, "id", None)
             t = (getattr(item, "titulo", None) or "").strip()

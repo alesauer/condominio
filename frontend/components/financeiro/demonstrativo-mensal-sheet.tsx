@@ -26,10 +26,12 @@ import {
   Trash2,
   Sparkles,
   FileDown,
+  Pencil,
 } from "lucide-react";
 import {
   useSalvarAcoesEventos,
   useDeleteAcaoEvento,
+  useSalvarTrocaGas,
   type DemonstrativoMensalResponse,
 } from "@/services/cobrancas.service";
 import { exportDemonstrativoPDF } from "@/lib/export-demonstrativo-pdf";
@@ -52,8 +54,41 @@ export function DemonstrativoMensalSheet({
     Array<{ id?: string; titulo: string; descricao: string; data?: string }>
   >([]);
 
+  const [trocaGasModalOpen, setTrocaGasModalOpen] = useState(false);
+  const [formTrocaGas, setFormTrocaGas] = useState({
+    ultima_troca: "",
+    previsao_proxima_troca: "",
+    observacao: "",
+  });
+
   const salvarAcoesMut = useSalvarAcoesEventos();
   const deleteAcaoMut = useDeleteAcaoEvento();
+  const salvarTrocaGasMut = useSalvarTrocaGas();
+
+  const handleOpenTrocaGasModal = () => {
+    setFormTrocaGas({
+      ultima_troca: data?.gas.troca_gas.ultima_troca || "",
+      previsao_proxima_troca: data?.gas.troca_gas.previsao_proxima_troca || "",
+      observacao: data?.gas.troca_gas.observacao || "",
+    });
+    setTrocaGasModalOpen(true);
+  };
+
+  const handleSaveTrocaGas = async () => {
+    try {
+      await salvarTrocaGasMut.mutateAsync({
+        competencia: data?.competencia,
+        ultima_troca: formTrocaGas.ultima_troca,
+        previsao_proxima_troca: formTrocaGas.previsao_proxima_troca,
+        observacao: formTrocaGas.observacao,
+      });
+      toast.success("Datas de troca do gás atualizadas com sucesso!");
+      setTrocaGasModalOpen(false);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Erro ao salvar dados da troca de gás.");
+    }
+  };
 
   const handleOpenModal = () => {
     if (data?.acoes_eventos && data.acoes_eventos.length > 0) {
@@ -561,8 +596,18 @@ export function DemonstrativoMensalSheet({
 
               {/* Bloco de Troca do Gás */}
               <div className="border border-slate-200 dark:border-slate-800 rounded overflow-hidden">
-                <div className="bg-slate-100 dark:bg-slate-900 p-1.5 text-center font-bold text-xs uppercase border-b border-slate-200 dark:border-slate-800">
-                  Troca do Gás
+                <div className="bg-slate-100 dark:bg-slate-900 p-1.5 px-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                  <span className="font-bold text-xs uppercase">Troca do Gás</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleOpenTrocaGasModal}
+                    className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1 print:hidden"
+                    title="Editar datas e previsão da troca de gás"
+                  >
+                    <Pencil className="h-3 w-3" /> Editar Datas
+                  </Button>
                 </div>
                 <div className="p-2 space-y-2 text-xs">
                   <div className="grid grid-cols-2 text-center gap-2 border-b pb-2">
@@ -759,6 +804,83 @@ export function DemonstrativoMensalSheet({
               disabled={salvarAcoesMut.isPending}
             >
               {salvarAcoesMut.isPending ? "Salvando..." : "Salvar Ações e Eventos"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição de Troca do Gás */}
+      <Dialog open={trocaGasModalOpen} onOpenChange={setTrocaGasModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-amber-500" />
+              Editar Troca do Gás
+            </DialogTitle>
+            <DialogDescription>
+              Ajuste as datas de última troca, previsão da próxima troca e observações para a competência {data?.competencia_formatada}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="input-ultima-troca" className="text-xs font-semibold">
+                  Última Troca
+                </Label>
+                <Input
+                  id="input-ultima-troca"
+                  placeholder="Ex: 08/2026 ou 15/08/2026"
+                  className="h-9 text-xs"
+                  value={formTrocaGas.ultima_troca}
+                  onChange={(e) =>
+                    setFormTrocaGas((prev) => ({ ...prev, ultima_troca: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="input-previsao-troca" className="text-xs font-semibold">
+                  Previsão Próxima Troca
+                </Label>
+                <Input
+                  id="input-previsao-troca"
+                  placeholder="Ex: 11/2026 ou 20/11/2026"
+                  className="h-9 text-xs"
+                  value={formTrocaGas.previsao_proxima_troca}
+                  onChange={(e) =>
+                    setFormTrocaGas((prev) => ({ ...prev, previsao_proxima_troca: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="input-obs-troca" className="text-xs font-semibold">
+                Observação / Informativo (Opcional)
+              </Label>
+              <Input
+                id="input-obs-troca"
+                placeholder="Ex: *Gás trocado a cada 3 meses aprox."
+                className="h-9 text-xs"
+                value={formTrocaGas.observacao}
+                onChange={(e) =>
+                  setFormTrocaGas((prev) => ({ ...prev, observacao: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => setTrocaGasModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveTrocaGas}
+              disabled={salvarTrocaGasMut.isPending}
+            >
+              {salvarTrocaGasMut.isPending ? "Salvando..." : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>

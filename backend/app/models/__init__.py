@@ -17,6 +17,7 @@ from app.models.ata import Ata
 from app.models.documento import Documento, CategoriaDocumento
 from app.models.anexo import Anexo
 from app.models.config_inadimplencia import ConfigInadimplencia
+from app.models.troca_gas_config import TrocaGasConfig
 from app.models.auditoria import Auditoria
 from app.models.token_refresh import TokenRefresh
 
@@ -40,6 +41,7 @@ __all__ = [
     "Documento", "CategoriaDocumento",
     "Anexo",
     "ConfigInadimplencia",
+    "TrocaGasConfig",
     "Auditoria",
     "TokenRefresh",
 ]

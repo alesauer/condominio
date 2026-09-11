@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from typing import Optional, List
+from typing import Optional, List, Union
 from uuid import UUID
 from pydantic import BaseModel, Field
 from app.models.receita import StatusFinanceiro
@@ -46,7 +46,7 @@ class CobrancaGerarMensal(BaseModel):
 
 
 class SalvarAcoesEventosRequest(BaseModel):
-    competencia: date
+    competencia: Union[date, str]
     acoes_eventos: List[DemonstrativoAcaoEventoInput] = Field(default_factory=list)
 
 
@@ -142,6 +142,13 @@ class DemonstrativoTrocaGas(BaseModel):
     ultima_troca: Optional[str] = "08/2026"
     previsao_proxima_troca: Optional[str] = "11/2026"
     observacao: Optional[str] = "Quando necessário, será adquirido novo botijão de gás no valor de R$ 399,00, retirando do fundo e cobrado mensalmente das unidades consumidoras."
+
+
+class SalvarTrocaGasRequest(BaseModel):
+    competencia: Optional[Union[date, str]] = None
+    ultima_troca: Optional[str] = None
+    previsao_proxima_troca: Optional[str] = None
+    observacao: Optional[str] = None
 
 
 class DemonstrativoLeituraGasItem(BaseModel):

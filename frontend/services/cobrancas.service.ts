@@ -219,4 +219,22 @@ export function useDeleteAcaoEvento() {
   });
 }
 
+export interface SalvarTrocaGasPayload {
+  competencia?: string;
+  ultima_troca?: string;
+  previsao_proxima_troca?: string;
+  observacao?: string;
+}
+
+export function useSalvarTrocaGas() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SalvarTrocaGasPayload) =>
+      api.post<DemonstrativoTrocaGas>("/cobrancas/troca-gas", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY, "demonstrativo-mensal"] });
+    },
+  });
+}
+
 

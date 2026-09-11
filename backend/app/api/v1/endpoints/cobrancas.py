@@ -11,6 +11,8 @@ from app.schemas.cobranca import (
     DemonstrativoMensalResponse,
     SalvarAcoesEventosRequest,
     DemonstrativoAcaoEvento,
+    SalvarTrocaGasRequest,
+    DemonstrativoTrocaGas,
 )
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
@@ -25,6 +27,15 @@ async def obter_demonstrativo_mensal(
     db: AsyncSession = Depends(get_db),
 ):
     return await cobranca_service.obter_demonstrativo_mensal(db, competencia=competencia)
+
+
+@router.post("/troca-gas", response_model=DemonstrativoTrocaGas)
+async def salvar_troca_gas(
+    data: SalvarTrocaGasRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    return await cobranca_service.salvar_troca_gas_config(db, data.model_dump(), usuario=current_user)
 
 
 @router.post("/acoes-eventos", response_model=list[DemonstrativoAcaoEvento])
