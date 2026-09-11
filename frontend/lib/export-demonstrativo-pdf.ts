@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable, { type UserOptions, type CellDef } from "jspdf-autotable";
 import type { DemonstrativoMensalResponse } from "@/services/cobrancas.service";
 
-export function exportDemonstrativoPDF(data: DemonstrativoMensalResponse) {
+export function generateDemonstrativoDoc(data: DemonstrativoMensalResponse): jsPDF {
   // Configura documento A4 em modo Paisagem (Landscape)
   const doc = new jsPDF({
     orientation: "landscape",
@@ -472,7 +472,18 @@ export function exportDemonstrativoPDF(data: DemonstrativoMensalResponse) {
     );
   }
 
-  // Gera e faz download do arquivo
+  return doc;
+}
+
+export function exportDemonstrativoPDF(data: DemonstrativoMensalResponse) {
+  const doc = generateDemonstrativoDoc(data);
   const filename = `Demonstrativo_Condominio_${data.competencia.replace("-", "_")}.pdf`;
   doc.save(filename);
+}
+
+export function getDemonstrativoPDFBase64(data: DemonstrativoMensalResponse): string {
+  const doc = generateDemonstrativoDoc(data);
+  const dataUri = doc.output("datauristring");
+  // Extrai o conteúdo base64 após a vírgula
+  return dataUri.includes(",") ? dataUri.split(",")[1] : dataUri;
 }

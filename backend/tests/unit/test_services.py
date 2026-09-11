@@ -532,6 +532,8 @@ class TestCobrancaService:
             make_mock_result(scalars_all_return=[]), # avisos (mês)
             make_mock_result(scalars_all_return=[]), # avisos (fallback)
             make_mock_result(scalars_all_return=[gas1]), # gas demonstrativo
+            make_mock_result(scalars_all_return=[]), # troca de gas config
+            make_mock_result(scalars_all_return=[]), # demonstrativo config (mensagem vencimento)
         ]
 
         res = await cobranca_service.obter_demonstrativo_mensal(mock_db, date(2026, 9, 1))
@@ -568,6 +570,60 @@ class TestCobrancaService:
         await cobranca_service.delete_acao_evento(mock_db, aviso_id)
         mock_db.delete.assert_called_once_with(mock_aviso)
         mock_db.commit.assert_awaited()
+
+    async def test_enviar_email_demonstrativo(self, mock_db, monkeypatch):
+        from app.services import cobranca_service
+        from app.schemas.cobranca import EnviarDemonstrativoEmailRequest, DestinatarioEmailItem
+
+        email_calls = []
+
+        async def mock_send_email(destinatarios, assunto, corpo_texto, corpo_html=None, anexos=None):
+            email_calls.append({"destinatarios": destinatarios, "assunto": assunto, "anexos": anexos})
+            return True
+
+        async def mock_obter_demonstrativo(db, comp):
+            return {
+                "competencia": comp,
+                "competencia_formatada": "Setembro/2026",
+                "mensagem_vencimento": "VENCIMENTO: 10/09/2026.",
+                "apartamentos_header": [],
+                "cobrancas_moradores": [
+                    {
+                        "apartamento_numero": "101",
+                        "valor_a_pagar": 450.0,
+                        "vencimento": date(2026, 9, 10),
+                    }
+                ],
+            }
+
+        monkeypatch.setattr(cobranca_service, "send_email", mock_send_email)
+        monkeypatch.setattr(cobranca_service, "obter_demonstrativo_mensal", mock_obter_demonstrativo)
+
+        req = EnviarDemonstrativoEmailRequest(
+            competencia="2026-09",
+            competencia_formatada="Setembro/2026",
+            assunto="Demonstrativo Mensal - Setembro/2026",
+            mensagem_personalizada="Segue o demonstrativo.",
+            destinatarios=[
+                DestinatarioEmailItem(
+                    apartamento_numero="101",
+                    bloco="A",
+                    responsavel_nome="Carlos Silva",
+                    email="carlos@exemplo.com",
+                )
+            ],
+            pdf_base64="JVBERi0xLjQKJcTl8uXr...",
+        )
+
+        res = await cobranca_service.enviar_email_demonstrativo(mock_db, req, usuario=None)
+        assert res["total_enviados"] == 1
+        assert res["total_falhas"] == 0
+        assert len(res["destinatarios"]) == 1
+        assert len(email_calls) == 1
+        assert email_calls[0]["destinatarios"] == ["carlos@exemplo.com"]
+        assert len(email_calls[0]["anexos"]) == 1
+        assert email_calls[0]["anexos"][0]["filename"] == "Demonstrativo_Condominio_2026_09.pdf"
+
 
 
 

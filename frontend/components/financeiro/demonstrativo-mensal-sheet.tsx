@@ -27,6 +27,7 @@ import {
   Sparkles,
   FileDown,
   Pencil,
+  Mail,
 } from "lucide-react";
 import {
   useSalvarAcoesEventos,
@@ -37,6 +38,7 @@ import {
 } from "@/services/cobrancas.service";
 import { exportDemonstrativoPDF } from "@/lib/export-demonstrativo-pdf";
 import { CalculoApartamentoModal } from "@/components/financeiro/calculo-apartamento-modal";
+import { EnviarDemonstrativoEmailModal } from "@/components/financeiro/enviar-demonstrativo-email-modal";
 import { toast } from "sonner";
 
 interface DemonstrativoMensalSheetProps {
@@ -65,6 +67,8 @@ export function DemonstrativoMensalSheet({
 
   const [calculoModalOpen, setCalculoModalOpen] = useState(false);
   const [selectedAptoCalculo, setSelectedAptoCalculo] = useState<string | null>(null);
+
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const handleOpenCalculoApto = (numero: string) => {
     setSelectedAptoCalculo(numero);
@@ -344,6 +348,14 @@ export function DemonstrativoMensalSheet({
             className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
           >
             <FileDown className="h-4 w-4 mr-1.5" /> Salvar PDF
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setEmailModalOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+          >
+            <Mail className="h-4 w-4 mr-1.5" /> Enviar por E-mail
           </Button>
         </div>
       </div>
@@ -1021,6 +1033,13 @@ export function DemonstrativoMensalSheet({
         apartamentoNumero={selectedAptoCalculo}
         competencia={data?.competencia}
         demonstrativoData={data}
+      />
+
+      {/* Modal de Envio do Demonstrativo por E-mail com PDF Anexo */}
+      <EnviarDemonstrativoEmailModal
+        open={emailModalOpen}
+        onOpenChange={setEmailModalOpen}
+        data={data}
       />
     </div>
   );

@@ -97,6 +97,7 @@ class DemonstrativoApartamentoHeader(BaseModel):
     bloco: Optional[str] = None
     fracao_ideal: float
     responsavel_nome: str
+    responsavel_email: Optional[str] = None
 
 
 class DemonstrativoDespesaItem(BaseModel):
@@ -118,6 +119,7 @@ class DemonstrativoCobrancaApto(BaseModel):
     apartamento_id: UUID
     apartamento_numero: str
     responsavel_nome: str
+    responsavel_email: Optional[str] = None
     valor_a_pagar: float
     vencimento: date
     status: str
@@ -187,6 +189,37 @@ class DemonstrativoMensalResponse(BaseModel):
     acoes_eventos: List[DemonstrativoAcaoEvento] = Field(default_factory=list)
     fracoes_agua: List[DemonstrativoFracaoAgua] = Field(default_factory=list)
     gas: DemonstrativoGas
+
+
+class DestinatarioEmailItem(BaseModel):
+    apartamento_numero: str
+    nome: Optional[str] = None
+    email: str
+
+
+class EnviarDemonstrativoEmailRequest(BaseModel):
+    competencia: Union[date, str]
+    destinatarios: Optional[List[DestinatarioEmailItem]] = None
+    assunto: Optional[str] = None
+    mensagem_personalizada: Optional[str] = None
+    pdf_base64: Optional[str] = None
+
+
+class EnvioEmailStatusItem(BaseModel):
+    apartamento_numero: str
+    nome: Optional[str] = None
+    email: Optional[str] = None
+    status: str
+    erro: Optional[str] = None
+
+
+class EnviarDemonstrativoEmailResult(BaseModel):
+    sucesso: bool
+    competencia: date
+    competencia_formatada: str
+    total_enviados: int
+    total_falhas: int
+    destinatarios: List[EnvioEmailStatusItem]
 
 
 

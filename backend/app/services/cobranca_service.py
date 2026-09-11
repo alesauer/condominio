@@ -18,6 +18,7 @@ from app.models.troca_gas_config import TrocaGasConfig
 from app.models.demonstrativo_config import DemonstrativoConfig
 from app.models.apartamento_morador import ApartamentoMorador
 from app.services.auditoria_service import registrar_auditoria
+from app.services.email_service import send_email
 
 
 async def list_cobrancas(db: AsyncSession, page=1, page_size=20, apartamento_id=None, competencia=None, status=None):
@@ -494,23 +495,31 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
 
     fracoes_map = {}
     responsaveis_map = {}
+    responsaveis_email_map = {}
     apartamentos_header = []
 
     for apto in apartamentos:
         f = Decimal(str(apto.fracao_ideal)) if apto.fracao_ideal and Decimal(str(apto.fracao_ideal)) > 0 else Decimal("0.142857")
         fracoes_map[apto.id] = f
 
+        resp_email = None
         if apto.responsavel and apto.responsavel.nome:
             resp_nome = apto.responsavel.nome
+            resp_email = apto.responsavel.email
         elif apto.proprietario and apto.proprietario.nome:
             resp_nome = f"{apto.proprietario.nome} (PROPRIETÁRIO)"
+            resp_email = apto.proprietario.email
         elif apto.moradores:
             nomes = [m.morador.nome for m in apto.moradores if m.morador and m.morador.nome]
             resp_nome = " e ".join(nomes[:2]) if nomes else "Morador"
+            emails = [m.morador.email for m in apto.moradores if m.morador and m.morador.email]
+            resp_email = emails[0] if emails else None
         else:
             resp_nome = "—"
+            resp_email = None
 
         responsaveis_map[apto.id] = resp_nome
+        responsaveis_email_map[apto.id] = resp_email
 
         apartamentos_header.append({
             "id": apto.id,
@@ -518,6 +527,7 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
             "bloco": apto.bloco,
             "fracao_ideal": float(f),
             "responsavel_nome": resp_nome,
+            "responsavel_email": resp_email,
         })
 
     soma_fracoes = sum(fracoes_map.values()) or Decimal("1.0")
@@ -669,6 +679,7 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                     "apartamento_id": apto.id,
                     "apartamento_numero": apto.numero,
                     "responsavel_nome": responsaveis_map[apto.id],
+                    "responsavel_email": responsaveis_email_map.get(apto.id),
                     "valor_a_pagar": float(val),
                     "vencimento": c.vencimento,
                     "status": c.status.value if hasattr(c.status, "value") else str(c.status),
@@ -680,6 +691,7 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                     "apartamento_id": apto.id,
                     "apartamento_numero": apto.numero,
                     "responsavel_nome": responsaveis_map[apto.id],
+                    "responsavel_email": responsaveis_email_map.get(apto.id),
                     "valor_a_pagar": float(total_despesas_por_apto[apto.numero] + valor_fundo_unitario),
                     "vencimento": date(competencia.year, competencia.month, 10),
                     "status": "pendente",
@@ -708,6 +720,7 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                 "apartamento_id": apto_id,
                 "apartamento_numero": apto.numero,
                 "responsavel_nome": responsaveis_map.get(apto_id, "—"),
+                "responsavel_email": responsaveis_email_map.get(apto_id),
                 "valor_a_pagar": float(val),
                 "vencimento": vencimento_padrao,
                 "status": "pendente",
@@ -1005,5 +1018,215 @@ async def delete_acao_evento(db: AsyncSession, aviso_id: str, usuario=None) -> N
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ação/Evento não encontrado")
     await db.delete(aviso)
     await db.commit()
+
+
+async def enviar_email_demonstrativo(db: AsyncSession, data: Any, usuario=None) -> Dict[str, Any]:
+    if hasattr(data, "model_dump"):
+        data_dict = data.model_dump()
+    elif isinstance(data, dict):
+        data_dict = data
+    else:
+        data_dict = vars(data)
+
+    comp = _parse_competencia(data_dict.get("competencia"))
+    comp_formatada = f"{MESES_PT[comp.month - 1]}/{comp.year}"
+
+    # Carrega dados do demonstrativo para compor o email
+    demonstrativo = await obter_demonstrativo_mensal(db, comp)
+
+    pdf_base64 = data_dict.get("pdf_base64")
+    assunto_custom = data_dict.get("assunto")
+    msg_custom = data_dict.get("mensagem_personalizada")
+    destinatarios_req = data_dict.get("destinatarios")
+
+    assunto = assunto_custom or f"Demonstrativo Mensal de Condomínio — {comp_formatada} — Residencial Monazita"
+
+    # Determina a lista de destinatários
+    lista_envio = []
+    if destinatarios_req and len(destinatarios_req) > 0:
+        for item in destinatarios_req:
+            if isinstance(item, dict):
+                em = (item.get("email") or "").strip()
+                if em:
+                    lista_envio.append({
+                        "apartamento_numero": item.get("apartamento_numero", ""),
+                        "nome": item.get("responsavel_nome") or item.get("nome") or "Morador",
+                        "email": em,
+                    })
+            else:
+                em = getattr(item, "email", None)
+                if em:
+                    lista_envio.append({
+                        "apartamento_numero": getattr(item, "apartamento_numero", ""),
+                        "nome": getattr(item, "responsavel_nome", None) or getattr(item, "nome", "Morador"),
+                        "email": em,
+                    })
+    else:
+        # Pega todos os apartamentos do demonstrativo
+        for header in demonstrativo.get("apartamentos_header", []):
+            em = header.get("responsavel_email")
+            if em and em.strip():
+                lista_envio.append({
+                    "apartamento_numero": header.get("numero", ""),
+                    "nome": header.get("responsavel_nome", "Morador"),
+                    "email": em.strip(),
+                })
+
+    if not lista_envio:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nenhum destinatário com e-mail válido selecionado para o envio.",
+        )
+
+    filename_pdf = f"Demonstrativo_Condominio_{comp.year}_{comp.month:02d}.pdf"
+    anexos = []
+    if pdf_base64:
+        anexos.append({
+            "filename": filename_pdf,
+            "content": pdf_base64,
+            "content_type": "application/pdf",
+        })
+
+    resultados = []
+    total_enviados = 0
+    total_falhas = 0
+
+    for dest in lista_envio:
+        apto_num = dest["apartamento_numero"]
+        nome_resp = dest["nome"]
+        dest_email = dest["email"]
+
+        # Busca dados da cobrança do apartamento se existir
+        cobranca_apto = next((c for c in demonstrativo.get("cobrancas_moradores", []) if c.get("apartamento_numero") == apto_num), None)
+        valor_apto_str = f"R$ {cobranca_apto['valor_a_pagar']:.2f}".replace(".", ",") if cobranca_apto else ""
+        venc_str = cobranca_apto["vencimento"].strftime('%d/%m/%Y') if cobranca_apto and cobranca_apto.get("vencimento") else f"10/{comp.month:02d}/{comp.year}"
+
+        corpo_texto = f"""Olá, {nome_resp}!
+
+Segue em anexo o Demonstrativo Mensal de Fechamento do Condomínio Residencial Monazita referente à competência {comp_formatada}.
+
+Resumo da Unidade (Apto {apto_num}):
+- Vencimento: {venc_str}
+{f"- Valor a Pagar: {valor_apto_str}" if valor_apto_str else ""}
+
+{msg_custom if msg_custom else ""}
+
+{demonstrativo.get('mensagem_vencimento', '')}
+
+Atenciosamente,
+Administração do Condomínio Residencial Monazita
+"""
+
+        corpo_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }}
+    .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
+    .header {{ background: #0f2c59; color: #ffffff; padding: 24px; text-align: center; }}
+    .header h1 {{ margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }}
+    .header p {{ margin: 4px 0 0 0; font-size: 13px; opacity: 0.9; }}
+    .content {{ padding: 24px; line-height: 1.6; font-size: 14px; }}
+    .card {{ background: #f1f5f9; border-left: 4px solid #0f2c59; padding: 14px 18px; border-radius: 6px; margin: 18px 0; }}
+    .alert-box {{ background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; padding: 12px; border-radius: 6px; font-size: 12px; font-style: italic; margin: 16px 0; }}
+    .footer {{ background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; text-align: center; font-size: 11px; color: #64748b; }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>CONDOMÍNIO RESIDENCIAL MONAZITA</h1>
+      <p>Demonstrativo Mensal de Fechamento — {comp_formatada}</p>
+    </div>
+    <div class="content">
+      <p>Olá, <strong>{nome_resp}</strong> (Apartamento {apto_num}),</p>
+      <p>Informamos que o <strong>Demonstrativo Mensal Consolidado</strong> do condomínio relativo ao mês de <strong>{comp_formatada}</strong> já foi apurado e está disponível.</p>
+      
+      <div class="card">
+        <div style="font-weight: bold; font-size: 13px; margin-bottom: 8px; color: #0f2c59;">RESUMO DA SUA UNIDADE (APTO {apto_num})</div>
+        <div>📅 <strong>Vencimento:</strong> {venc_str}</div>
+        {f'<div>💰 <strong>Valor do Condomínio:</strong> <span style="font-size: 16px; font-weight: bold; color: #0f2c59;">{valor_apto_str}</span></div>' if valor_apto_str else ''}
+      </div>
+
+      {f'<p style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 10px; border-radius: 6px; font-size: 13px; color: #6b21a8;"><strong>Mensagem da Administração:</strong><br>{msg_custom}</p>' if msg_custom else ''}
+
+      <div class="alert-box">
+        {demonstrativo.get('mensagem_vencimento', '')}
+      </div>
+
+      <p style="font-size: 13px; color: #475569;">
+        📎 <em>O relatório detalhado em PDF com a memória de cálculo completa de despesas, água, gás e fundo de reserva segue em anexo a este e-mail.</em>
+      </p>
+    </div>
+    <div class="footer">
+      Condomínio Residencial Monazita — Gestão e Transparência Financeira<br>
+      Mensagem automática enviada pelo sistema.
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+        try:
+            ok = await send_email(
+                destinatarios=[dest_email],
+                assunto=assunto,
+                corpo_texto=corpo_texto,
+                corpo_html=corpo_html,
+                anexos=anexos if anexos else None,
+            )
+            if ok:
+                total_enviados += 1
+                resultados.append({
+                    "apartamento_numero": apto_num,
+                    "nome": nome_resp,
+                    "email": dest_email,
+                    "status": "enviado",
+                    "erro": None,
+                })
+            else:
+                total_falhas += 1
+                resultados.append({
+                    "apartamento_numero": apto_num,
+                    "nome": nome_resp,
+                    "email": dest_email,
+                    "status": "falha",
+                    "erro": "Falha ao despachar e-mail pelo servidor SMTP",
+                })
+        except Exception as ex:
+            total_falhas += 1
+            resultados.append({
+                "apartamento_numero": apto_num,
+                "nome": nome_resp,
+                "email": dest_email,
+                "status": "falha",
+                "erro": str(ex),
+            })
+
+    # Auditoria
+    await registrar_auditoria(
+        db,
+        usuario,
+        "ENVIO_DEMONSTRATIVO_EMAIL",
+        "Cobranca",
+        None,
+        dados_novos={
+            "competencia": str(comp),
+            "total_enviados": total_enviados,
+            "total_falhas": total_falhas,
+            "destinatarios": [d["email"] for d in lista_envio],
+        },
+    )
+
+    return {
+        "sucesso": total_enviados > 0,
+        "competencia": comp,
+        "competencia_formatada": comp_formatada,
+        "total_enviados": total_enviados,
+        "total_falhas": total_falhas,
+        "destinatarios": resultados,
+    }
 
 

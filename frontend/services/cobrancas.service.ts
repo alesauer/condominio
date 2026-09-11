@@ -105,6 +105,7 @@ export interface DemonstrativoApartamentoHeader {
   bloco: string | null;
   fracao_ideal: number;
   responsavel_nome: string;
+  responsavel_email?: string | null;
 }
 
 export interface DemonstrativoDespesaItem {
@@ -126,6 +127,7 @@ export interface DemonstrativoCobrancaApto {
   apartamento_id: string;
   apartamento_numero: string;
   responsavel_nome: string;
+  responsavel_email?: string | null;
   valor_a_pagar: number;
   vencimento: string;
   status: string;
@@ -251,6 +253,44 @@ export function useSalvarMensagemVencimento() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [KEY, "demonstrativo-mensal"] });
     },
+  });
+}
+
+export interface DestinatarioEmailItem {
+  apartamento_numero: string;
+  nome?: string;
+  email: string;
+}
+
+export interface EnviarDemonstrativoEmailPayload {
+  competencia: string;
+  destinatarios?: DestinatarioEmailItem[];
+  assunto?: string;
+  mensagem_personalizada?: string;
+  pdf_base64?: string;
+}
+
+export interface EnvioEmailStatusItem {
+  apartamento_numero: string;
+  nome?: string;
+  email?: string;
+  status: string;
+  erro?: string | null;
+}
+
+export interface EnviarDemonstrativoEmailResult {
+  sucesso: boolean;
+  competencia: string;
+  competencia_formatada: string;
+  total_enviados: number;
+  total_falhas: number;
+  destinatarios: EnvioEmailStatusItem[];
+}
+
+export function useEnviarDemonstrativoEmail() {
+  return useMutation({
+    mutationFn: (data: EnviarDemonstrativoEmailPayload) =>
+      api.post<EnviarDemonstrativoEmailResult>("/cobrancas/enviar-email-demonstrativo", data).then((r) => r.data),
   });
 }
 

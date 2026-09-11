@@ -14,6 +14,8 @@ from app.schemas.cobranca import (
     SalvarTrocaGasRequest,
     DemonstrativoTrocaGas,
     SalvarMensagemVencimentoRequest,
+    EnviarDemonstrativoEmailRequest,
+    EnviarDemonstrativoEmailResult,
 )
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
@@ -28,6 +30,15 @@ async def obter_demonstrativo_mensal(
     db: AsyncSession = Depends(get_db),
 ):
     return await cobranca_service.obter_demonstrativo_mensal(db, competencia=competencia)
+
+
+@router.post("/enviar-email-demonstrativo", response_model=EnviarDemonstrativoEmailResult)
+async def enviar_email_demonstrativo(
+    data: EnviarDemonstrativoEmailRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    return await cobranca_service.enviar_email_demonstrativo(db, data.model_dump(), usuario=current_user)
 
 
 @router.post("/mensagem-vencimento")
