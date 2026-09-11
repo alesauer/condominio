@@ -282,15 +282,16 @@ async def seed_monazita():
 
         # 2. Apartamentos, Proprietários e Moradores
         for apto_data in DADOS_APARTAMENTOS:
-            # Buscar ou criar Proprietário
+            # Buscar ou criar Proprietário como Morador
             p_data = apto_data["proprietario"]
-            prop = await db.scalar(select(Proprietario).where(Proprietario.cpf == p_data["cpf"]))
+            prop = await db.scalar(select(Morador).where(Morador.cpf == p_data["cpf"]))
             if not prop:
-                prop = Proprietario(
+                prop = Morador(
                     nome=p_data["nome"],
                     cpf=p_data["cpf"],
                     email=p_data["email"],
-                    telefone=p_data["telefone"]
+                    telefone=p_data["telefone"],
+                    tipo=TipoMorador.proprietario,
                 )
                 db.add(prop)
                 await db.flush()
@@ -298,6 +299,8 @@ async def seed_monazita():
                 prop.nome = p_data["nome"]
                 prop.email = p_data["email"]
                 prop.telefone = p_data["telefone"]
+                if not prop.tipo:
+                    prop.tipo = TipoMorador.proprietario
 
             # Buscar ou criar Apartamento
             apto = await db.scalar(select(Apartamento).where(Apartamento.numero == apto_data["numero"]))
