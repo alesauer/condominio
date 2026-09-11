@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DemonstrativoMensalSheet } from "@/components/financeiro/demonstrativo-mensal-sheet";
+import { CalculoApartamentoModal } from "@/components/financeiro/calculo-apartamento-modal";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -72,6 +73,27 @@ export default function CobrancasPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [calculoModalOpen, setCalculoModalOpen] = useState(false);
+  const [selectedAptoCalculo, setSelectedAptoCalculo] = useState<{
+    numero: string;
+    competencia: string;
+  } | null>(null);
+
+  const handleOpenCalculoApto = (numero?: string | null, competencia?: string | Date | null) => {
+    if (!numero) return;
+    const compStr =
+      typeof competencia === "string"
+        ? competencia
+        : competencia instanceof Date
+        ? competencia.toISOString().slice(0, 10)
+        : competenciaParam;
+
+    setSelectedAptoCalculo({
+      numero,
+      competencia: compStr,
+    });
+    setCalculoModalOpen(true);
+  };
 
   // Mês / Ano Selecionado
   const today = new Date();
@@ -719,7 +741,19 @@ export default function CobrancasPage() {
                       return (
                         <tr key={c.id} className="hover:bg-muted/30 transition-colors">
                           <td className="p-3 font-semibold text-foreground whitespace-nowrap">
-                            {aptoDisplay}
+                            {c.apartamento_numero ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCalculoApto(c.apartamento_numero, c.competencia)}
+                                className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 font-bold hover:underline transition-colors group cursor-pointer text-left"
+                                title={`Clique para ver a memória de cálculo do ${aptoDisplay}`}
+                              >
+                                <Building2 className="h-3.5 w-3.5 text-primary/70 group-hover:scale-110 transition-transform" />
+                                <span>{aptoDisplay}</span>
+                              </button>
+                            ) : (
+                              aptoDisplay
+                            )}
                           </td>
                           <td className="p-3 font-medium text-muted-foreground">
                             {c.descricao}
@@ -743,22 +777,37 @@ export default function CobrancasPage() {
                             </span>
                           </td>
                           <td className="p-3 text-right">
-                            {c.status !== "pago" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handlePagar(c.id)}
-                                disabled={pagarMut.isPending}
-                              >
-                                <CheckCircle className="mr-1.5 h-4 w-4 text-emerald-500" />
-                                Pagar
-                              </Button>
-                            )}
-                            {c.status === "pago" && c.data_pagamento && (
-                              <span className="text-xs text-muted-foreground">
-                                Pago em {formatDate(c.data_pagamento)}
-                              </span>
-                            )}
+                            <div className="flex items-center justify-end gap-2">
+                              {c.apartamento_numero && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenCalculoApto(c.apartamento_numero, c.competencia)}
+                                  className="h-8 px-2 text-xs gap-1 text-primary hover:bg-primary/10 hover:text-primary"
+                                  title="Visualizar cálculo detalhado do condomínio"
+                                >
+                                  <Calculator className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Cálculo</span>
+                                </Button>
+                              )}
+                              {c.status !== "pago" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handlePagar(c.id)}
+                                  disabled={pagarMut.isPending}
+                                  className="h-8 text-xs"
+                                >
+                                  <CheckCircle className="mr-1 h-3.5 w-3.5 text-emerald-500" />
+                                  Pagar
+                                </Button>
+                              )}
+                              {c.status === "pago" && c.data_pagamento && (
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                  Pago em {formatDate(c.data_pagamento)}
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -806,6 +855,19 @@ export default function CobrancasPage() {
           )}
         </>
       )}
+
+      {/* Modal de Memória de Cálculo Individual do Apartamento */}
+      <CalculoApartamentoModal
+        open={calculoModalOpen}
+        onOpenChange={setCalculoModalOpen}
+        apartamentoNumero={selectedAptoCalculo?.numero || null}
+        competencia={selectedAptoCalculo?.competencia || competenciaParam}
+        demonstrativoData={
+          selectedAptoCalculo?.competencia === competenciaParam || !selectedAptoCalculo?.competencia
+            ? demonstrativoData
+            : undefined
+        }
+      />
     </div>
   );
 }

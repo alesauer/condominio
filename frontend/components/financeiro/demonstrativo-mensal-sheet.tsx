@@ -35,6 +35,7 @@ import {
   type DemonstrativoMensalResponse,
 } from "@/services/cobrancas.service";
 import { exportDemonstrativoPDF } from "@/lib/export-demonstrativo-pdf";
+import { CalculoApartamentoModal } from "@/components/financeiro/calculo-apartamento-modal";
 import { toast } from "sonner";
 
 interface DemonstrativoMensalSheetProps {
@@ -60,6 +61,14 @@ export function DemonstrativoMensalSheet({
     previsao_proxima_troca: "",
     observacao: "",
   });
+
+  const [calculoModalOpen, setCalculoModalOpen] = useState(false);
+  const [selectedAptoCalculo, setSelectedAptoCalculo] = useState<string | null>(null);
+
+  const handleOpenCalculoApto = (numero: string) => {
+    setSelectedAptoCalculo(numero);
+    setCalculoModalOpen(true);
+  };
 
   const salvarAcoesMut = useSalvarAcoesEventos();
   const deleteAcaoMut = useDeleteAcaoEvento();
@@ -337,7 +346,14 @@ export function DemonstrativoMensalSheet({
                       key={a.id}
                       className="p-2 border-r border-sky-200 dark:border-sky-800 text-right min-w-[70px] last:border-r-0"
                     >
-                      {a.numero}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenCalculoApto(a.numero)}
+                        className="hover:underline text-sky-900 dark:text-sky-200 hover:text-primary font-bold cursor-pointer"
+                        title={`Ver cálculo detalhado do Apto ${a.numero}`}
+                      >
+                        {a.numero}
+                      </button>
                     </th>
                   ))}
                 </tr>
@@ -468,7 +484,14 @@ export function DemonstrativoMensalSheet({
                       className="border-b border-blue-100 dark:border-blue-900/50 hover:bg-muted/30 transition-colors"
                     >
                       <td className="p-2.5 font-bold border-r border-blue-100 dark:border-blue-900/50 text-foreground">
-                        {c.apartamento_numero}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCalculoApto(c.apartamento_numero)}
+                          className="hover:underline text-primary hover:text-primary/80 font-bold transition-colors cursor-pointer text-left inline-flex items-center gap-1"
+                          title={`Ver memória de cálculo do Apto ${c.apartamento_numero}`}
+                        >
+                          <span>{c.apartamento_numero}</span>
+                        </button>
                       </td>
                       <td className="p-2.5 font-medium uppercase border-r border-blue-100 dark:border-blue-900/50 text-foreground">
                         {c.responsavel_nome}
@@ -653,7 +676,14 @@ export function DemonstrativoMensalSheet({
                         className="border-b border-amber-100 dark:border-amber-900/40 hover:bg-muted/30"
                       >
                         <td className="p-1.5 font-bold border-r border-amber-100 dark:border-amber-900/40 text-foreground">
-                          Apto {g.apartamento_numero}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCalculoApto(g.apartamento_numero)}
+                            className="hover:underline text-amber-950 dark:text-amber-200 hover:text-primary font-bold transition-colors cursor-pointer"
+                            title={`Ver cálculo do Apto ${g.apartamento_numero}`}
+                          >
+                            Apto {g.apartamento_numero}
+                          </button>
                         </td>
                         <td className="p-1.5 text-right border-r border-amber-100 dark:border-amber-900/40 text-muted-foreground">
                           {g.leitura_anterior.toFixed(1)}
@@ -885,6 +915,15 @@ export function DemonstrativoMensalSheet({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Memória de Cálculo do Apartamento */}
+      <CalculoApartamentoModal
+        open={calculoModalOpen}
+        onOpenChange={setCalculoModalOpen}
+        apartamentoNumero={selectedAptoCalculo}
+        competencia={data?.competencia}
+        demonstrativoData={data}
+      />
     </div>
   );
 }
