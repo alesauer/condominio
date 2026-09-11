@@ -529,7 +529,8 @@ class TestCobrancaService:
             make_mock_result(scalars_all_return=[]), # parcelas
             make_mock_result(scalar_one_or_none_return=None), # agua
             make_mock_result(scalars_all_return=[gas1]), # gas
-            make_mock_result(scalars_all_return=[]), # avisos
+            make_mock_result(scalars_all_return=[]), # avisos (mês)
+            make_mock_result(scalars_all_return=[]), # avisos (fallback)
             make_mock_result(scalars_all_return=[gas1]), # gas demonstrativo
         ]
 
@@ -546,6 +547,27 @@ class TestCobrancaService:
         assert res["despesas_itens"][1]["rateio_por_apto"]["101"] == 350.0
         assert res["despesas_itens"][1]["rateio_por_apto"]["201"] == 350.0
         assert len(res["cobrancas_moradores"]) == 2
+
+    async def test_salvar_acoes_eventos(self, mock_db):
+        from app.services import cobranca_service
+        acoes = [
+            {"titulo": "Manutenção Portão", "descricao": "Troca de molas", "data": date(2026, 9, 5)},
+        ]
+        res = await cobranca_service.salvar_acoes_eventos(mock_db, date(2026, 9, 1), acoes)
+        assert len(res) == 1
+        assert res[0]["titulo"] == "Manutenção Portão"
+        mock_db.commit.assert_awaited()
+
+    async def test_delete_acao_evento(self, mock_db):
+        from app.services import cobranca_service
+        from app.models.aviso import Aviso
+        aviso_id = str(uuid.uuid4())
+        mock_aviso = Aviso(id=uuid.UUID(aviso_id), titulo="Teste", descricao="Desc", data_publicacao=date(2026, 9, 1))
+        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=mock_aviso)
+
+        await cobranca_service.delete_acao_evento(mock_db, aviso_id)
+        mock_db.delete.assert_called_once_with(mock_aviso)
+        mock_db.commit.assert_awaited()
 
 
 

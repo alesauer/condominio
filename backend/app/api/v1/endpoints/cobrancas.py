@@ -9,6 +9,8 @@ from app.schemas.cobranca import (
     CobrancaGerarMensalResult,
     CobrancaPreviaResult,
     DemonstrativoMensalResponse,
+    SalvarAcoesEventosRequest,
+    DemonstrativoAcaoEvento,
 )
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
@@ -23,6 +25,27 @@ async def obter_demonstrativo_mensal(
     db: AsyncSession = Depends(get_db),
 ):
     return await cobranca_service.obter_demonstrativo_mensal(db, competencia=competencia)
+
+
+@router.post("/acoes-eventos", response_model=list[DemonstrativoAcaoEvento])
+async def salvar_acoes_eventos(
+    data: SalvarAcoesEventosRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    return await cobranca_service.salvar_acoes_eventos(
+        db, competencia=data.competencia, acoes_eventos=data.acoes_eventos, usuario=current_user
+    )
+
+
+@router.delete("/acoes-eventos/{aviso_id}", status_code=204)
+async def delete_acao_evento(
+    aviso_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    await cobranca_service.delete_acao_evento(db, aviso_id=aviso_id, usuario=current_user)
+    return None
 
 
 @router.get("", response_model=PaginatedResponse[CobrancaResponse], dependencies=[Depends(admin_required)])

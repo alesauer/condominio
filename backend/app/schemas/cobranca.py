@@ -26,15 +26,28 @@ class CobrancaResponse(BaseModel):
         from_attributes = True
 
 
+class DemonstrativoAcaoEventoInput(BaseModel):
+    id: Optional[str] = None
+    titulo: str
+    descricao: str
+    data: Optional[date] = None
+
+
 class CobrancaGerarMensal(BaseModel):
     competencia: date
     vencimento: date
     valor_fundo_reserva: float = Field(default=0.0, ge=0, description="Valor do fundo de reserva por apartamento (opcional)")
     valor_base_condominio: Optional[float] = Field(default=None, description="Alias legado para valor_fundo_reserva")
-    incluir_despesas: bool = Field(default=True, description="Somar despesas do mês e ratear por fração ideal")
+    incluir_despesas: bool = Field(default=True, description="Somar despesas do mês e ratear")
     incluir_agua: bool = Field(default=True, description="Incluir rateio de água da competência se apurado")
     incluir_gas: bool = Field(default=True, description="Incluir consumo de gás da competência se apurado")
     descricao: Optional[str] = Field(default=None, description="Descrição personalizada do lançamento (opcional)")
+    acoes_eventos: Optional[List[DemonstrativoAcaoEventoInput]] = Field(default_factory=list, description="Ações e eventos realizados no mês")
+
+
+class SalvarAcoesEventosRequest(BaseModel):
+    competencia: date
+    acoes_eventos: List[DemonstrativoAcaoEventoInput] = Field(default_factory=list)
 
 
 class CobrancaPreviaApartamento(BaseModel):

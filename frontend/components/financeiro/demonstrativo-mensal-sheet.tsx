@@ -1,12 +1,37 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Printer, Download, AlertCircle, FileSpreadsheet, CheckCircle2, Clock } from "lucide-react";
-import type { DemonstrativoMensalResponse } from "@/services/cobrancas.service";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Printer,
+  Download,
+  AlertCircle,
+  FileSpreadsheet,
+  CheckCircle2,
+  Clock,
+  Plus,
+  Trash2,
+  Sparkles,
+} from "lucide-react";
+import {
+  useSalvarAcoesEventos,
+  useDeleteAcaoEvento,
+  type DemonstrativoMensalResponse,
+} from "@/services/cobrancas.service";
+import { toast } from "sonner";
 
 interface DemonstrativoMensalSheetProps {
   data?: DemonstrativoMensalResponse;
@@ -20,6 +45,76 @@ export function DemonstrativoMensalSheet({
   onRefresh,
 }: DemonstrativoMensalSheetProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editItems, setEditItems] = useState<
+    Array<{ id?: string; titulo: string; descricao: string; data?: string }>
+  >([]);
+
+  const salvarAcoesMut = useSalvarAcoesEventos();
+  const deleteAcaoMut = useDeleteAcaoEvento();
+
+  const handleOpenModal = () => {
+    if (data?.acoes_eventos && data.acoes_eventos.length > 0) {
+      setEditItems(
+        data.acoes_eventos.map((a) => ({
+          id: a.id,
+          titulo: a.titulo,
+          descricao: a.descricao,
+          data: a.data || data.competencia,
+        }))
+      );
+    } else {
+      setEditItems([
+        {
+          titulo: "",
+          descricao: "",
+          data: data?.competencia || "",
+        },
+      ]);
+    }
+    setModalOpen(true);
+  };
+
+  const handleAddRow = () => {
+    setEditItems((prev) => [
+      ...prev,
+      {
+        titulo: "",
+        descricao: "",
+        data: data?.competencia || "",
+      },
+    ]);
+  };
+
+  const handleRemoveRow = async (index: number) => {
+    const item = editItems[index];
+    if (item.id && data?.competencia) {
+      try {
+        await deleteAcaoMut.mutateAsync({ id: item.id, competencia: data.competencia });
+        toast.success("Ação/evento excluído com sucesso.");
+        if (onRefresh) onRefresh();
+      } catch {
+        toast.error("Erro ao excluir item.");
+      }
+    }
+    setEditItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveAcoes = async () => {
+    if (!data?.competencia) return;
+    const validItems = editItems.filter((i) => i.titulo.trim() && i.descricao.trim());
+    try {
+      await salvarAcoesMut.mutateAsync({
+        competencia: data.competencia,
+        acoes_eventos: validItems,
+      });
+      toast.success("Ações e eventos atualizados com sucesso!");
+      setModalOpen(false);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Erro ao salvar ações e eventos.");
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -368,8 +463,17 @@ export function DemonstrativoMensalSheet({
 
         {/* ── SEÇÃO 4: AÇÕES/EVENTOS REALIZADOS NO MÊS ─────────────────── */}
         <div className="space-y-1">
-          <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-200 px-3 py-1 font-bold text-center uppercase tracking-wide rounded-t text-xs">
-            Ações / Eventos Realizados no Mês
+          <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-200 px-3 py-1 font-bold flex items-center justify-between uppercase tracking-wide rounded-t text-xs">
+            <div className="flex-1 text-center">Ações / Eventos Realizados no Mês</div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenModal}
+              className="h-6 text-[11px] gap-1 px-2.5 print:hidden bg-background text-primary hover:text-primary hover:bg-primary/10 shadow-xs border-slate-300 dark:border-slate-700"
+            >
+              <Plus className="h-3 w-3" /> Gerenciar Ações
+            </Button>
           </div>
           <div className="border border-slate-300 dark:border-slate-800 rounded-b overflow-x-auto">
             <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
@@ -384,6 +488,14 @@ export function DemonstrativoMensalSheet({
                   <tr>
                     <td colSpan={2} className="p-3 text-center text-muted-foreground italic">
                       Nenhum comunicado ou evento extraordinário registrado no mês.
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={handleOpenModal}
+                        className="text-xs text-primary p-0 ml-2 print:hidden h-auto"
+                      >
+                        + Adicionar Ação
+                      </Button>
                     </td>
                   </tr>
                 ) : (
@@ -438,20 +550,20 @@ export function DemonstrativoMensalSheet({
                       <span className="font-bold text-foreground">{data.gas.troca_gas.ultima_troca || "08/2026"}</span>
                     </div>
                     <div className="p-1.5 bg-muted/40 rounded border">
-                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Previsão Próxima</span>
-                      <span className="font-bold text-primary">{data.gas.troca_gas.previsao_proxima_troca || "11/2026"}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase block font-semibold">Previsão Próxima Troca</span>
+                      <span className="font-bold text-foreground">{data.gas.troca_gas.previsao_proxima_troca || "11/2026"}</span>
                     </div>
                   </div>
-                  <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-                    <span className="font-semibold">Observação:</span> {data.gas.troca_gas.observacao}
+                  <p className="text-muted-foreground leading-relaxed italic text-[11px]">
+                    {data.gas.troca_gas.observacao}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Bloco Direito: Leitura e Medição do Gás */}
-            <div className="border border-amber-300 dark:border-amber-800 rounded overflow-hidden flex flex-col">
-              <div className="bg-amber-100 dark:bg-amber-950/60 p-1.5 text-center font-bold text-xs uppercase border-b border-amber-300 dark:border-amber-800 text-amber-950 dark:text-amber-200 flex items-center justify-between px-3">
+            {/* Bloco Direito: Leitura do Gás */}
+            <div className="border border-amber-200 dark:border-amber-800 rounded overflow-hidden flex flex-col">
+              <div className="bg-amber-100/80 dark:bg-amber-950/60 p-1.5 font-bold text-xs uppercase border-b border-amber-200 dark:border-amber-800 text-amber-950 dark:text-amber-200 flex justify-between items-center">
                 <span>Leitura do Gás</span>
                 <span className="font-mono text-[11px] font-normal">
                   R$ {data.gas.preco_m3.toFixed(2).replace(".", ",")} o M³
@@ -511,6 +623,125 @@ export function DemonstrativoMensalSheet({
           </div>
         </div>
       </div>
+
+      {/* Modal de Gerenciamento de Ações e Eventos do Mês */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              Ações / Eventos Realizados no Mês
+            </DialogTitle>
+            <DialogDescription>
+              Adicione ou edite os comunicados, manutenções e eventos extraordinários para {data.competencia_formatada}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Lista de Ações e Eventos
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddRow}
+                className="h-8 gap-1 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" /> Adicionar Linha
+              </Button>
+            </div>
+
+            {editItems.length === 0 ? (
+              <div className="text-center py-6 border border-dashed rounded bg-muted/20 text-xs text-muted-foreground">
+                Nenhum evento na lista. Clique em &quot;Adicionar Linha&quot; para inserir.
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                {editItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-lg border bg-card/80 space-y-2.5 shadow-sm relative group"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-medium text-muted-foreground">Data (Opcional)</Label>
+                          <Input
+                            type="date"
+                            className="h-8 text-xs"
+                            value={item.data || ""}
+                            onChange={(e) => {
+                              const copy = [...editItems];
+                              copy[idx].data = e.target.value;
+                              setEditItems(copy);
+                            }}
+                          />
+                        </div>
+                        <div className="sm:col-span-2 space-y-1">
+                          <Label className="text-[11px] font-medium text-muted-foreground">
+                            Ação / Evento Realizado <span className="text-rose-500">*</span>
+                          </Label>
+                          <Input
+                            placeholder="Ex: Manutenção Portão Eletrônico"
+                            className="h-8 text-xs"
+                            value={item.titulo}
+                            onChange={(e) => {
+                              const copy = [...editItems];
+                              copy[idx].titulo = e.target.value;
+                              setEditItems(copy);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 mt-4"
+                        onClick={() => handleRemoveRow(idx)}
+                        title="Remover linha"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-medium text-muted-foreground">
+                        Descrição Detalhada <span className="text-rose-500">*</span>
+                      </Label>
+                      <Input
+                        placeholder="Ex: Realizada troca das molas e lubrificação das guias."
+                        className="h-8 text-xs"
+                        value={item.descricao}
+                        onChange={(e) => {
+                          const copy = [...editItems];
+                          copy[idx].descricao = e.target.value;
+                          setEditItems(copy);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAcoes}
+              disabled={salvarAcoesMut.isPending}
+            >
+              {salvarAcoesMut.isPending ? "Salvando..." : "Salvar Ações e Eventos"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

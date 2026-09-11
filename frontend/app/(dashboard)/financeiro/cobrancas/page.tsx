@@ -48,6 +48,9 @@ import {
   Calendar,
   Building2,
   AlertCircle,
+  Sparkles,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DemonstrativoMensalSheet } from "@/components/financeiro/demonstrativo-mensal-sheet";
@@ -56,6 +59,13 @@ const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
+
+interface AcaoEventoFormItem {
+  id?: string;
+  titulo: string;
+  descricao: string;
+  data?: string;
+}
 
 export default function CobrancasPage() {
   const [viewMode, setViewMode] = useState<"demonstrativo" | "lista">("demonstrativo");
@@ -102,6 +112,8 @@ export default function CobrancasPage() {
     descricao: "",
   });
 
+  const [acoesEventos, setAcoesEventos] = useState<AcaoEventoFormItem[]>([]);
+
   // Atualiza form ao trocar o mês do topo
   useEffect(() => {
     setFormGerar((prev) => ({
@@ -119,6 +131,47 @@ export default function CobrancasPage() {
     isLoading: isDemonstrativoLoading,
     refetch: refetchDemonstrativo,
   } = useDemonstrativoMensal(competenciaParam);
+
+  // Preenche ações/eventos quando abre o modal de geração
+  useEffect(() => {
+    if (dialogOpen) {
+      if (demonstrativoData?.acoes_eventos && demonstrativoData.acoes_eventos.length > 0) {
+        setAcoesEventos(
+          demonstrativoData.acoes_eventos.map((a) => ({
+            id: a.id,
+            titulo: a.titulo,
+            descricao: a.descricao,
+            data: a.data || competenciaParam,
+          }))
+        );
+      } else {
+        setAcoesEventos([]);
+      }
+    }
+  }, [dialogOpen, demonstrativoData, competenciaParam]);
+
+  const handleAddAcao = () => {
+    setAcoesEventos((prev) => [
+      ...prev,
+      {
+        titulo: "",
+        descricao: "",
+        data: formGerar.competencia,
+      },
+    ]);
+  };
+
+  const handleRemoveAcao = (index: number) => {
+    setAcoesEventos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateAcao = (index: number, field: keyof AcaoEventoFormItem, value: string) => {
+    setAcoesEventos((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
 
   // Query das cobranças individuais
   const { data, isLoading, refetch: refetchCobrancas } = useCobrancas({
@@ -196,6 +249,14 @@ export default function CobrancasPage() {
         incluir_agua: formGerar.incluir_agua,
         incluir_gas: formGerar.incluir_gas,
         descricao: formGerar.descricao || undefined,
+        acoes_eventos: acoesEventos
+          .filter((a) => a.titulo.trim() && a.descricao.trim())
+          .map((a) => ({
+            id: a.id,
+            titulo: a.titulo.trim(),
+            descricao: a.descricao.trim(),
+            data: a.data || formGerar.competencia,
+          })),
       });
       toast.success(`${res.geradas} cobranças geradas com sucesso! Total: ${formatCurrency(res.total_valor)}`);
       setDialogOpen(false);
@@ -366,6 +427,87 @@ export default function CobrancasPage() {
                       onChange={(e) => setFormGerar({ ...formGerar, descricao: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* Ações / Eventos Realizados no Mês */}
+                <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-purple-500" />
+                        <span className="text-sm font-semibold">Ações / Eventos Realizados no Mês</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Comunicações, manutenções ou eventos extraordinários para constar no demonstrativo mensal
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddAcao}
+                      className="h-8 gap-1 text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Adicionar Ação
+                    </Button>
+                  </div>
+
+                  {acoesEventos.length === 0 ? (
+                    <div className="text-center py-3 border border-dashed rounded bg-background/50 text-xs text-muted-foreground">
+                      Nenhuma ação/evento adicionado. Clique em &quot;Adicionar Ação&quot; para incluir manutenções ou avisos no demonstrativo.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
+                      {acoesEventos.map((acao, index) => (
+                        <div
+                          key={index}
+                          className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-2.5 rounded border bg-background/80 shadow-sm items-start"
+                        >
+                          <div className="sm:col-span-3 space-y-1">
+                            <Label className="text-[11px] font-medium text-muted-foreground">Data (Opcional)</Label>
+                            <Input
+                              type="date"
+                              className="h-8 text-xs"
+                              value={acao.data || ""}
+                              onChange={(e) => handleUpdateAcao(index, "data", e.target.value)}
+                            />
+                          </div>
+                          <div className="sm:col-span-4 space-y-1">
+                            <Label className="text-[11px] font-medium text-muted-foreground">Ação / Evento</Label>
+                            <Input
+                              placeholder="Ex: Manutenção Portão"
+                              className="h-8 text-xs"
+                              value={acao.titulo}
+                              onChange={(e) => handleUpdateAcao(index, "titulo", e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="sm:col-span-4 space-y-1">
+                            <Label className="text-[11px] font-medium text-muted-foreground">Descrição</Label>
+                            <Input
+                              placeholder="Ex: Troca de molas e lubrificação"
+                              className="h-8 text-xs"
+                              value={acao.descricao}
+                              onChange={(e) => handleUpdateAcao(index, "descricao", e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="sm:col-span-1 flex items-end justify-center pt-2 sm:pt-5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                              onClick={() => handleRemoveAcao(index)}
+                              title="Remover ação"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Prévia dos Valores Calculados */}

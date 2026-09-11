@@ -5,6 +5,13 @@ import type { PaginatedResponse } from "@/types";
 
 const KEY = "cobrancas";
 
+export interface AcaoEventoPayload {
+  id?: string;
+  titulo: string;
+  descricao: string;
+  data?: string | null;
+}
+
 export interface GerarCobrancasPayload {
   competencia: string;
   vencimento: string;
@@ -14,6 +21,7 @@ export interface GerarCobrancasPayload {
   incluir_agua?: boolean;
   incluir_gas?: boolean;
   descricao?: string;
+  acoes_eventos?: AcaoEventoPayload[];
 }
 
 export interface CobrancaPreviaApartamento {
@@ -186,6 +194,28 @@ export function useDemonstrativoMensal(competencia: string) {
         })
         .then((r) => r.data),
     enabled: !!competencia,
+  });
+}
+
+export function useSalvarAcoesEventos() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { competencia: string; acoes_eventos: AcaoEventoPayload[] }) =>
+      api.post<DemonstrativoAcaoEvento[]>("/cobrancas/acoes-eventos", data).then((r) => r.data),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: [KEY, "demonstrativo-mensal", vars.competencia] });
+    },
+  });
+}
+
+export function useDeleteAcaoEvento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, competencia }: { id: string; competencia: string }) =>
+      api.delete(`/cobrancas/acoes-eventos/${id}`),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: [KEY, "demonstrativo-mensal", vars.competencia] });
+    },
   });
 }
 

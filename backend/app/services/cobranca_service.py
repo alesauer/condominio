@@ -381,6 +381,27 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         geradas.append(cobranca)
         total_valor += valor_total_apto
 
+    # Salva ações e eventos informados para o mês
+    acoes_input = data.get("acoes_eventos") or []
+    for acao in acoes_input:
+        if isinstance(acao, dict):
+            t = acao.get("titulo")
+            d = acao.get("descricao")
+            dt = acao.get("data") or competencia
+        else:
+            t = getattr(acao, "titulo", None)
+            d = getattr(acao, "descricao", None)
+            dt = getattr(acao, "data", None) or competencia
+
+        if t and d:
+            aviso = Aviso(
+                titulo=t,
+                descricao=d,
+                data_publicacao=dt,
+                prioridade="baixa",
+            )
+            db.add(aviso)
+
     await db.flush()
 
     await registrar_auditoria(
@@ -396,6 +417,7 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
             "total_agua": float(calc["total_agua"]),
             "total_gas": float(calc["total_gas"]),
             "total_fundo_reserva": float(calc["total_fundo_reserva"]),
+            "acoes_eventos_count": len(acoes_input),
         },
         usuario=usuario,
     )
@@ -675,12 +697,27 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dic
             })
 
     # 5. Ações / Eventos Realizados no Mês
+    start_date = date(competencia.year, competencia.month, 1)
+    if competencia.month == 12:
+        end_date = date(competencia.year + 1, 1, 1)
+    else:
+        end_date = date(competencia.year, competencia.month + 1, 1)
+
     avisos_res = await db.execute(
         select(Aviso)
-        .order_by(Aviso.data_publicacao.desc(), Aviso.created_at.desc())
-        .limit(10)
+        .where(Aviso.data_publicacao >= start_date, Aviso.data_publicacao < end_date)
+        .order_by(Aviso.data_publicacao.asc(), Aviso.created_at.asc())
     )
     avisos = avisos_res.scalars().all()
+    if not avisos:
+        # Se ainda não houver avisos no mês específico, busca os mais recentes
+        avisos_res = await db.execute(
+            select(Aviso)
+            .order_by(Aviso.data_publicacao.desc(), Aviso.created_at.desc())
+            .limit(10)
+        )
+        avisos = avisos_res.scalars().all()
+
     acoes_eventos = []
     for a in avisos:
         acoes_eventos.append({
@@ -767,5 +804,68 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dic
             },
         },
     }
+
+
+async def salvar_acoes_eventos(db: AsyncSession, competencia: date, acoes_eventos: List[Any], usuario=None) -> List[Dict[str, Any]]:
+    salvos = []
+    for item in acoes_eventos:
+        if isinstance(item, dict):
+            item_id = item.get("id")
+            t = (item.get("titulo") or "").strip()
+            d = (item.get("descricao") or "").strip()
+            dt = item.get("data") or competencia
+        else:
+            item_id = getattr(item, "id", None)
+            t = (getattr(item, "titulo", None) or "").strip()
+            d = (getattr(item, "descricao", None) or "").strip()
+            dt = getattr(item, "data", None) or competencia
+
+        if not t or not d:
+            continue
+
+        if item_id:
+            try:
+                res = await db.execute(select(Aviso).where(Aviso.id == item_id))
+                aviso = res.scalar_one_or_none()
+                if aviso:
+                    aviso.titulo = t
+                    aviso.descricao = d
+                    aviso.data_publicacao = dt
+                    salvos.append(aviso)
+                    continue
+            except Exception:
+                pass
+
+        novo_aviso = Aviso(
+            titulo=t,
+            descricao=d,
+            data_publicacao=dt,
+            prioridade="baixa",
+        )
+        db.add(novo_aviso)
+        salvos.append(novo_aviso)
+
+    await db.commit()
+    for a in salvos:
+        await db.refresh(a)
+
+    return [
+        {
+            "id": str(a.id),
+            "titulo": a.titulo,
+            "descricao": a.descricao,
+            "data": a.data_publicacao,
+        }
+        for a in salvos
+    ]
+
+
+async def delete_acao_evento(db: AsyncSession, aviso_id: str, usuario=None) -> None:
+    res = await db.execute(select(Aviso).where(Aviso.id == aviso_id))
+    aviso = res.scalar_one_or_none()
+    if not aviso:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ação/Evento não encontrado")
+    await db.delete(aviso)
+    await db.commit()
 
 
