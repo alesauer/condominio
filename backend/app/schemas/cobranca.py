@@ -151,6 +151,11 @@ class SalvarTrocaGasRequest(BaseModel):
     observacao: Optional[str] = None
 
 
+class SalvarMensagemVencimentoRequest(BaseModel):
+    competencia: Optional[Union[date, str]] = None
+    mensagem_vencimento: str
+
+
 class DemonstrativoLeituraGasItem(BaseModel):
     apartamento_numero: str
     leitura_anterior: float
@@ -171,6 +176,7 @@ class DemonstrativoMensalResponse(BaseModel):
     competencia: date
     competencia_formatada: str
     vencimento_padrao: Optional[date] = None
+    mensagem_vencimento: Optional[str] = None
     apartamentos_header: List[DemonstrativoApartamentoHeader] = Field(default_factory=list)
     despesas_itens: List[DemonstrativoDespesaItem] = Field(default_factory=list)
     total_despesas_mes: float = 0.0

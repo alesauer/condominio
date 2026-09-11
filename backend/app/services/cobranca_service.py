@@ -15,6 +15,7 @@ from app.models.agua_rateio_apartamento import AguaRateioApartamento
 from app.models.leitura_gas import LeituraGas
 from app.models.aviso import Aviso
 from app.models.troca_gas_config import TrocaGasConfig
+from app.models.demonstrativo_config import DemonstrativoConfig
 from app.models.apartamento_morador import ApartamentoMorador
 from app.services.auditoria_service import registrar_auditoria
 
@@ -815,10 +816,29 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
         else "Quando necessário, será adquirido novo botijão de gás no valor de R$ 399,00, retirando do fundo e cobrado mensalmente das unidades consumidoras."
     )
 
+    # Consulta configuração geral do demonstrativo (mensagem de vencimento)
+    venc_date = vencimento_padrao or date(competencia.year, competencia.month, 10)
+    venc_str = venc_date.strftime('%d/%m/%Y')
+    mensagem_padrao = f"VENCIMENTO: {venc_str}. APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME ESTABELECIDO NA CONVENÇÃO DO CONDOMÍNIO."
+
+    demo_cfg_res = await db.execute(
+        select(DemonstrativoConfig)
+        .where(
+            (DemonstrativoConfig.competencia == competencia) | (DemonstrativoConfig.competencia.is_(None))
+        )
+        .order_by(DemonstrativoConfig.competencia.desc().nullslast(), DemonstrativoConfig.updated_at.desc())
+    )
+    demo_cfg = demo_cfg_res.scalars().first()
+    if demo_cfg and demo_cfg.mensagem_vencimento and demo_cfg.mensagem_vencimento.strip():
+        mensagem_vencimento = demo_cfg.mensagem_vencimento.strip().replace("{vencimento}", venc_str)
+    else:
+        mensagem_vencimento = mensagem_padrao
+
     return {
         "competencia": competencia,
         "competencia_formatada": competencia_formatada,
-        "vencimento_padrao": vencimento_padrao or date(competencia.year, competencia.month, 10),
+        "vencimento_padrao": venc_date,
+        "mensagem_vencimento": mensagem_vencimento,
         "apartamentos_header": apartamentos_header,
         "despesas_itens": despesas_itens,
         "total_despesas_mes": float(total_despesas_mes),
@@ -839,6 +859,43 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                 "observacao": obs_troca,
             },
         },
+    }
+
+
+async def salvar_mensagem_vencimento(db: AsyncSession, data: Any, usuario=None) -> Dict[str, Any]:
+    if hasattr(data, "model_dump"):
+        data_dict = data.model_dump()
+    elif isinstance(data, dict):
+        data_dict = data
+    else:
+        data_dict = vars(data)
+
+    comp = data_dict.get("competencia")
+    if comp:
+        comp = _parse_competencia(comp)
+
+    query = select(DemonstrativoConfig)
+    if comp:
+        query = query.where(DemonstrativoConfig.competencia == comp)
+    else:
+        query = query.where(DemonstrativoConfig.competencia.is_(None))
+
+    res = await db.execute(query)
+    cfg = res.scalar_one_or_none()
+
+    if not cfg:
+        cfg = DemonstrativoConfig(competencia=comp)
+        db.add(cfg)
+
+    msg = str(data_dict.get("mensagem_vencimento") or "").strip()
+    cfg.mensagem_vencimento = msg
+
+    await db.commit()
+    await db.refresh(cfg)
+
+    return {
+        "competencia": cfg.competencia,
+        "mensagem_vencimento": cfg.mensagem_vencimento,
     }
 
 

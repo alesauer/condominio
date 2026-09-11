@@ -172,6 +172,7 @@ export interface DemonstrativoMensalResponse {
   competencia: string;
   competencia_formatada: string;
   vencimento_padrao?: string | null;
+  mensagem_vencimento?: string | null;
   apartamentos_header: DemonstrativoApartamentoHeader[];
   despesas_itens: DemonstrativoDespesaItem[];
   total_despesas_mes: number;
@@ -236,5 +237,22 @@ export function useSalvarTrocaGas() {
     },
   });
 }
+
+export interface SalvarMensagemVencimentoPayload {
+  competencia?: string;
+  mensagem_vencimento: string;
+}
+
+export function useSalvarMensagemVencimento() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: SalvarMensagemVencimentoPayload) =>
+      api.post<{ competencia?: string; mensagem_vencimento: string }>("/cobrancas/mensagem-vencimento", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY, "demonstrativo-mensal"] });
+    },
+  });
+}
+
 
 

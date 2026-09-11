@@ -18,6 +18,7 @@ from app.models.documento import Documento, CategoriaDocumento
 from app.models.anexo import Anexo
 from app.models.config_inadimplencia import ConfigInadimplencia
 from app.models.troca_gas_config import TrocaGasConfig
+from app.models.demonstrativo_config import DemonstrativoConfig
 from app.models.auditoria import Auditoria
 from app.models.token_refresh import TokenRefresh
 
@@ -42,6 +43,7 @@ __all__ = [
     "Anexo",
     "ConfigInadimplencia",
     "TrocaGasConfig",
+    "DemonstrativoConfig",
     "Auditoria",
     "TokenRefresh",
 ]

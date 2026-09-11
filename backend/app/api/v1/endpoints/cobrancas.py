@@ -13,6 +13,7 @@ from app.schemas.cobranca import (
     DemonstrativoAcaoEvento,
     SalvarTrocaGasRequest,
     DemonstrativoTrocaGas,
+    SalvarMensagemVencimentoRequest,
 )
 from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
@@ -27,6 +28,15 @@ async def obter_demonstrativo_mensal(
     db: AsyncSession = Depends(get_db),
 ):
     return await cobranca_service.obter_demonstrativo_mensal(db, competencia=competencia)
+
+
+@router.post("/mensagem-vencimento")
+async def salvar_mensagem_vencimento(
+    data: SalvarMensagemVencimentoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    return await cobranca_service.salvar_mensagem_vencimento(db, data.model_dump(), usuario=current_user)
 
 
 @router.post("/troca-gas", response_model=DemonstrativoTrocaGas)

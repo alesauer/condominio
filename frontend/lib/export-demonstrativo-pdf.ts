@@ -240,6 +240,10 @@ export function exportDemonstrativoPDF(data: DemonstrativoMensalResponse) {
     ? new Date(data.vencimento_padrao + "T00:00:00").toLocaleDateString("pt-BR")
     : `10/${data.competencia.split("-")[1]}/${data.competencia.split("-")[0]}`;
 
+  const msgVenc =
+    data.mensagem_vencimento ||
+    `VENCIMENTO: ${vencStr}. APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME ESTABELECIDO NA CONVENÇÃO DO CONDOMÍNIO.`;
+
   doc.setFillColor(254, 242, 242);
   doc.setDrawColor(252, 165, 165);
   doc.rect(marginX, currentY, contentWidth, 5.5, "FD");
@@ -248,10 +252,10 @@ export function exportDemonstrativoPDF(data: DemonstrativoMensalResponse) {
   doc.setFontSize(7);
   doc.setTextColor(185, 28, 28);
   doc.text(
-    `VENCIMENTO: ${vencStr}. APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME CONVENÇÃO DO CONDOMÍNIO.`,
+    msgVenc,
     pageWidth / 2,
     currentY + 3.8,
-    { align: "center" }
+    { align: "center", maxWidth: contentWidth - 4 }
   );
 
   currentY += 8;

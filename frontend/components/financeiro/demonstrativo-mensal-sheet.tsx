@@ -32,6 +32,7 @@ import {
   useSalvarAcoesEventos,
   useDeleteAcaoEvento,
   useSalvarTrocaGas,
+  useSalvarMensagemVencimento,
   type DemonstrativoMensalResponse,
 } from "@/services/cobrancas.service";
 import { exportDemonstrativoPDF } from "@/lib/export-demonstrativo-pdf";
@@ -70,9 +71,43 @@ export function DemonstrativoMensalSheet({
     setCalculoModalOpen(true);
   };
 
+  const [msgVencModalOpen, setMsgVencModalOpen] = useState(false);
+  const [formMsgVenc, setFormMsgVenc] = useState("");
+
   const salvarAcoesMut = useSalvarAcoesEventos();
   const deleteAcaoMut = useDeleteAcaoEvento();
   const salvarTrocaGasMut = useSalvarTrocaGas();
+  const salvarMsgVencMut = useSalvarMensagemVencimento();
+
+  const handleOpenMsgVencModal = () => {
+    const vencPadrao = data?.vencimento_padrao
+      ? new Date(data.vencimento_padrao + "T00:00:00").toLocaleDateString("pt-BR")
+      : data?.competencia
+      ? `10/${data.competencia.split("-")[1]}/${data.competencia.split("-")[0]}`
+      : "10/10/2026";
+
+    const currentMsg =
+      data?.mensagem_vencimento ||
+      `VENCIMENTO: ${vencPadrao}. APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME ESTABELECIDO NA CONVENÇÃO DO CONDOMÍNIO.`;
+
+    setFormMsgVenc(currentMsg);
+    setMsgVencModalOpen(true);
+  };
+
+  const handleSaveMsgVenc = async () => {
+    if (!formMsgVenc.trim()) return;
+    try {
+      await salvarMsgVencMut.mutateAsync({
+        competencia: data?.competencia,
+        mensagem_vencimento: formMsgVenc.trim(),
+      });
+      toast.success("Frase de vencimento atualizada com sucesso!");
+      setMsgVencModalOpen(false);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Erro ao salvar frase de vencimento.");
+    }
+  };
 
   const handleOpenTrocaGasModal = () => {
     setFormTrocaGas({
@@ -529,14 +564,30 @@ export function DemonstrativoMensalSheet({
           </div>
 
           {/* Aviso de Vencimento e Juros */}
-          <div className="py-2.5 px-3 text-center text-xs font-bold italic tracking-wide text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded mt-1">
-            VENCIMENTO:{" "}
-            <span className="underline">
-              {data.vencimento_padrao
-                ? new Date(data.vencimento_padrao + "T00:00:00").toLocaleDateString("pt-BR")
-                : "10/" + data.competencia.split("-")[1] + "/" + data.competencia.split("-")[0]}
-            </span>
-            . APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME ESTABELECIDO NA CONVENÇÃO DO CONDOMÍNIO.
+          <div className="py-2.5 px-3 text-xs font-bold italic tracking-wide text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded mt-1 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div className="flex-1 text-center">
+              {data.mensagem_vencimento || (
+                <>
+                  VENCIMENTO:{" "}
+                  <span className="underline">
+                    {data.vencimento_padrao
+                      ? new Date(data.vencimento_padrao + "T00:00:00").toLocaleDateString("pt-BR")
+                      : "10/" + data.competencia.split("-")[1] + "/" + data.competencia.split("-")[0]}
+                  </span>
+                  . APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME ESTABELECIDO NA CONVENÇÃO DO CONDOMÍNIO.
+                </>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenMsgVencModal}
+              className="h-6 px-2 text-[11px] text-rose-800 dark:text-rose-200 hover:bg-rose-100 dark:hover:bg-rose-900/60 gap-1 print:hidden shrink-0"
+              title="Editar frase de vencimento e juros"
+            >
+              <Pencil className="h-3 w-3" /> Editar Frase
+            </Button>
           </div>
         </div>
 
@@ -911,6 +962,53 @@ export function DemonstrativoMensalSheet({
               disabled={salvarTrocaGasMut.isPending}
             >
               {salvarTrocaGasMut.isPending ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição da Frase de Vencimento e Multa */}
+      <Dialog open={msgVencModalOpen} onOpenChange={setMsgVencModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-rose-500" />
+              Editar Frase de Vencimento e Juros
+            </DialogTitle>
+            <DialogDescription>
+              Personalize o aviso informativo exibido no rodapé do demonstrativo mensal e no extrato em PDF para {data?.competencia_formatada}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="input-frase-venc" className="text-xs font-semibold">
+                Texto da Frase / Comunicado de Vencimento
+              </Label>
+              <textarea
+                id="input-frase-venc"
+                rows={4}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 font-sans leading-relaxed"
+                placeholder="VENCIMENTO: 10/10/2026. APÓS ESSA DATA, O PAGAMENTO ACARRETARÁ JUROS E MULTA CONFORME ESTABELECIDO NA CONVENÇÃO DO CONDOMÍNIO."
+                value={formMsgVenc}
+                onChange={(e) => setFormMsgVenc(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Você pode digitar a frase completa com a data desejada ou usar <code>&#123;vencimento&#125;</code> para inserir automaticamente a data formatada.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => setMsgVencModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveMsgVenc}
+              disabled={salvarMsgVencMut.isPending}
+            >
+              {salvarMsgVencMut.isPending ? "Salvando..." : "Salvar Frase"}
             </Button>
           </DialogFooter>
         </DialogContent>
