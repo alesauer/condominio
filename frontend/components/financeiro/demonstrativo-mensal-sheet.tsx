@@ -172,7 +172,7 @@ export function DemonstrativoMensalSheet({
         {/* ── SEÇÃO 1: DESPESAS DO MÊS ─────────────────────────────────── */}
         <div className="space-y-1">
           <div className="bg-sky-100 dark:bg-sky-950/60 border border-sky-300 dark:border-sky-800 text-sky-950 dark:text-sky-200 px-3 py-1.5 font-bold text-center uppercase tracking-wide rounded-t">
-            Despesas do Mês (Rateio por Fração Ideal)
+            Despesas do Mês
           </div>
           <div className="border border-sky-300 dark:border-sky-800 rounded-b overflow-x-auto">
             <table className="w-full text-left border-collapse text-[11px] sm:text-xs">

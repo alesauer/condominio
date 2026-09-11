@@ -259,7 +259,7 @@ export default function CobrancasPage() {
                   <Calculator className="h-5 w-5 text-primary" /> Gerar Lote de Cobranças do Mês
                 </DialogTitle>
                 <DialogDescription>
-                  Consolidação automática: soma as despesas do mês por fração ideal, rateio de água, consumo individual de gás e valor do fundo de reserva por apartamento.
+                  Consolidação automática: soma as despesas do mês divididas igualmente, rateio de água por fração ideal, consumo individual de gás e valor do fundo de reserva por apartamento.
                 </DialogDescription>
               </DialogHeader>
 
@@ -301,7 +301,7 @@ export default function CobrancasPage() {
                         <span className="text-sm font-medium">Despesas do Mês</span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Soma despesas únicas e parceladas e rateia de acordo com a fração ideal de cada apartamento
+                        Soma despesas únicas e parceladas e divide igualmente entre os apartamentos
                       </p>
                     </div>
                     <Switch

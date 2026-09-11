@@ -515,16 +515,17 @@ class TestCobrancaService:
         apto1 = Apartamento(id=uuid.uuid4(), numero="101", fracao_ideal=Decimal("0.6000"))
         apto2 = Apartamento(id=uuid.uuid4(), numero="201", fracao_ideal=Decimal("0.4000"))
         desp1 = Despesa(id=uuid.uuid4(), descricao="Copasa", valor=Decimal("300.00"), competencia=date(2026, 9, 1), parcelamento=False)
+        desp2 = Despesa(id=uuid.uuid4(), descricao="Zeladora", valor=Decimal("700.00"), competencia=date(2026, 9, 1), parcelamento=False)
         gas1 = LeituraGas(apartamento_id=apto1.id, competencia=date(2026, 9, 1), consumo=Decimal("5.0"), valor_cobrado=Decimal("99.75"))
 
         mock_db.execute.side_effect = [
             make_mock_result(scalars_all_return=[apto1, apto2]), # aptos
-            make_mock_result(scalars_all_return=[desp1]), # despesas unicas
+            make_mock_result(scalars_all_return=[desp1, desp2]), # despesas unicas
             make_mock_result(scalars_all_return=[]), # despesas parcelas
             make_mock_result(scalars_all_return=[]), # cobrancas existentes
             # _calcular_componentes_cobranca fallback:
             make_mock_result(scalars_all_return=[apto1, apto2]), # aptos
-            make_mock_result(scalars_all_return=[desp1]), # despesas unicas
+            make_mock_result(scalars_all_return=[desp1, desp2]), # despesas unicas
             make_mock_result(scalars_all_return=[]), # parcelas
             make_mock_result(scalar_one_or_none_return=None), # agua
             make_mock_result(scalars_all_return=[gas1]), # gas
@@ -536,10 +537,14 @@ class TestCobrancaService:
         assert res["competencia"] == date(2026, 9, 1)
         assert res["competencia_formatada"] == "Setembro/2026"
         assert len(res["apartamentos_header"]) == 2
-        assert len(res["despesas_itens"]) == 1
-        assert res["total_despesas_mes"] == 300.0
+        assert len(res["despesas_itens"]) == 2
+        assert res["total_despesas_mes"] == 1000.0
+        # Copasa (água): fracionada
         assert res["despesas_itens"][0]["rateio_por_apto"]["101"] == 180.0
         assert res["despesas_itens"][0]["rateio_por_apto"]["201"] == 120.0
+        # Zeladora: dividida igualmente
+        assert res["despesas_itens"][1]["rateio_por_apto"]["101"] == 350.0
+        assert res["despesas_itens"][1]["rateio_por_apto"]["201"] == 350.0
         assert len(res["cobrancas_moradores"]) == 2
 
 

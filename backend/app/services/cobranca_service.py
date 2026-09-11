@@ -129,28 +129,61 @@ async def _calcular_componentes_cobranca(
 
         # Parcelas de despesas
         parc_res = await db.execute(
-            select(DespesaParcela).where(
+            select(DespesaParcela)
+            .options(selectinload(DespesaParcela.despesa))
+            .where(
                 DespesaParcela.competencia == competencia,
                 DespesaParcela.status != StatusFinanceiro.cancelado,
             )
         )
         parcelas = parc_res.scalars().all()
 
-        total_despesas_mes = sum((Decimal(str(d.valor)) for d in despesas_unicas), Decimal("0.00")) + \
-                             sum((Decimal(str(p.valor)) for p in parcelas), Decimal("0.00"))
+        num_aptos = Decimal(str(len(apartamentos)))
 
-        if total_despesas_mes > Decimal("0.00"):
-            soma_desp_calc = Decimal("0.00")
+        # Process single despesas: fraction only for water/copasa, equal for other expenses
+        for d in despesas_unicas:
+            v = Decimal(str(d.valor))
+            total_despesas_mes += v
+            desc_lower = d.descricao.lower()
+            cat_lower = (d.categoria or "").lower()
+            is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
+
+            soma_parcial = Decimal("0.00")
             for apto in apartamentos:
-                fracao = fracoes_map[apto.id]
-                v_apto = (fracao / soma_fracoes * total_despesas_mes).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-                despesas_map[apto.id] = v_apto
-                soma_desp_calc += v_apto
+                if is_agua:
+                    v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                else:
+                    v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                despesas_map[apto.id] += v_apto
+                soma_parcial += v_apto
 
-            diff_desp = total_despesas_mes - soma_desp_calc
-            if diff_desp != Decimal("0.00") and apartamentos:
-                maior_apto = max(apartamentos, key=lambda a: fracoes_map[a.id])
-                despesas_map[maior_apto.id] += diff_desp
+            diff = v - soma_parcial
+            if diff != Decimal("0.00") and apartamentos:
+                maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
+                despesas_map[maior.id] += diff
+
+        # Process parcelas: fraction only for water/copasa, equal for other expenses
+        for p in parcelas:
+            v = Decimal(str(p.valor))
+            total_despesas_mes += v
+            desc = p.despesa.descricao if p.despesa else "Despesa Parcelada"
+            desc_lower = desc.lower()
+            cat_lower = (p.despesa.categoria if p.despesa and p.despesa.categoria else "").lower()
+            is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
+
+            soma_parcial = Decimal("0.00")
+            for apto in apartamentos:
+                if is_agua:
+                    v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                else:
+                    v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                despesas_map[apto.id] += v_apto
+                soma_parcial += v_apto
+
+            diff = v - soma_parcial
+            if diff != Decimal("0.00") and apartamentos:
+                maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
+                despesas_map[maior.id] += diff
 
     # 3. Rateio de Água
     agua_map: Dict[Any, Decimal] = {apto.id: Decimal("0.00") for apto in apartamentos}
@@ -471,20 +504,30 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dic
     despesas_itens = []
     total_despesas_por_apto = {apto.numero: Decimal("0.00") for apto in apartamentos}
     total_despesas_mes = Decimal("0.00")
+    num_aptos = Decimal(str(len(apartamentos)))
 
     for d in despesas_unicas:
         v = Decimal(str(d.valor))
         total_despesas_mes += v
         rateio = {}
         soma_parcial = Decimal("0.00")
+
+        # O cálculo da fração ideal é exclusivo para a despesa de água (Copasa). Demais despesas são divididas igualmente.
+        desc_lower = d.descricao.lower()
+        cat_lower = (d.categoria or "").lower()
+        is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
+
         for apto in apartamentos:
-            v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if is_agua:
+                v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            else:
+                v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             rateio[apto.numero] = float(v_apto)
             total_despesas_por_apto[apto.numero] += v_apto
             soma_parcial += v_apto
         diff = v - soma_parcial
         if diff != Decimal("0.00") and apartamentos:
-            maior = max(apartamentos, key=lambda a: fracoes_map[a.id])
+            maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
             rateio[maior.numero] = float(Decimal(str(rateio[maior.numero])) + diff)
             total_despesas_por_apto[maior.numero] += diff
 
@@ -508,14 +551,22 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: date) -> Dic
         desc_full = f"{desc} ({p.numero_parcela}/{tot_parc})"
         rateio = {}
         soma_parcial = Decimal("0.00")
+
+        desc_lower = desc.lower()
+        cat_lower = (p.despesa.categoria if p.despesa and p.despesa.categoria else "").lower()
+        is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
+
         for apto in apartamentos:
-            v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            if is_agua:
+                v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            else:
+                v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             rateio[apto.numero] = float(v_apto)
             total_despesas_por_apto[apto.numero] += v_apto
             soma_parcial += v_apto
         diff = v - soma_parcial
         if diff != Decimal("0.00") and apartamentos:
-            maior = max(apartamentos, key=lambda a: fracoes_map[a.id])
+            maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
             rateio[maior.numero] = float(Decimal(str(rateio[maior.numero])) + diff)
             total_despesas_por_apto[maior.numero] += diff
 
