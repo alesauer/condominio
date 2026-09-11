@@ -13,8 +13,11 @@ import app.models  # noqa: F401
 
 
 async def seed():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception:
+        pass
 
     async with async_session() as db:
         existing_admin = await db.scalar(

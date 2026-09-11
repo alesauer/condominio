@@ -17,14 +17,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'demonstrativo_config',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('competencia', sa.Date(), nullable=True, index=True),
-        sa.Column('mensagem_vencimento', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS demonstrativo_config (
+            id UUID PRIMARY KEY,
+            competencia DATE,
+            mensagem_vencimento TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_demonstrativo_config_competencia ON demonstrativo_config (competencia);")
 
 
 def downgrade() -> None:

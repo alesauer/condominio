@@ -18,26 +18,25 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add responsavel_id column
-    op.add_column(
-        'apartamentos',
-        sa.Column('responsavel_id', postgresql.UUID(as_uuid=True), nullable=True)
-    )
-    # Create foreign key referencing moradores
-    op.create_foreign_key(
-        'apartamentos_responsavel_id_fkey',
-        'apartamentos',
-        'moradores',
-        ['responsavel_id'],
-        ['id'],
-        ondelete='SET NULL'
-    )
-    # Create index
-    op.create_index(
-        'ix_apartamentos_responsavel_id',
-        'apartamentos',
-        ['responsavel_id']
-    )
+    # Add responsavel_id column safely
+    op.execute("ALTER TABLE apartamentos ADD COLUMN IF NOT EXISTS responsavel_id UUID")
+
+    # Create foreign key referencing moradores safely
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.table_constraints 
+                WHERE constraint_name = 'apartamentos_responsavel_id_fkey'
+            ) THEN
+                ALTER TABLE apartamentos ADD CONSTRAINT apartamentos_responsavel_id_fkey 
+                FOREIGN KEY (responsavel_id) REFERENCES moradores(id) ON DELETE SET NULL;
+            END IF;
+        END $$;
+    """)
+
+    # Create index safely
+    op.execute("CREATE INDEX IF NOT EXISTS ix_apartamentos_responsavel_id ON apartamentos (responsavel_id)")
 
     # Initialize responsavel_id with proprietario_id if available
     op.execute("""

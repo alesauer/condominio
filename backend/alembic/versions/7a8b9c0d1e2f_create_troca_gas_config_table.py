@@ -17,16 +17,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'troca_gas_config',
-        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column('competencia', sa.Date(), nullable=True, index=True),
-        sa.Column('ultima_troca', sa.String(length=50), nullable=True),
-        sa.Column('previsao_proxima_troca', sa.String(length=50), nullable=True),
-        sa.Column('observacao', sa.Text(), nullable=True),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS troca_gas_config (
+            id UUID PRIMARY KEY,
+            competencia DATE,
+            ultima_troca VARCHAR(50),
+            previsao_proxima_troca VARCHAR(50),
+            observacao TEXT,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_troca_gas_config_competencia ON troca_gas_config (competencia);")
 
 
 def downgrade() -> None:

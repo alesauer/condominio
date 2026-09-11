@@ -18,12 +18,12 @@ depends_on = None
 
 def upgrade() -> None:
     # Add comprovante_url and comprovante_nome to despesas
-    op.add_column('despesas', sa.Column('comprovante_url', sa.String(length=500), nullable=True))
-    op.add_column('despesas', sa.Column('comprovante_nome', sa.String(length=255), nullable=True))
+    op.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS comprovante_url VARCHAR(500)")
+    op.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS comprovante_nome VARCHAR(255)")
 
     # Add comprovante_url and comprovante_nome to receitas
-    op.add_column('receitas', sa.Column('comprovante_url', sa.String(length=500), nullable=True))
-    op.add_column('receitas', sa.Column('comprovante_nome', sa.String(length=255), nullable=True))
+    op.execute("ALTER TABLE receitas ADD COLUMN IF NOT EXISTS comprovante_url VARCHAR(500)")
+    op.execute("ALTER TABLE receitas ADD COLUMN IF NOT EXISTS comprovante_nome VARCHAR(255)")
 
 
 def downgrade() -> None:
