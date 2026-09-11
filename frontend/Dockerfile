@@ -7,4 +7,9 @@ RUN npm install
 
 COPY . .
 
-CMD ["npm", "run", "dev"]
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+RUN npm run build
+
+CMD ["npm", "run", "start", "--", "-p", "3000"]
