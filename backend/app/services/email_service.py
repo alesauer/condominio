@@ -70,15 +70,28 @@ async def send_email(
             )
             return True
 
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
-        server.starttls()
+        if settings.SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        else:
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+            server.starttls()
+
         if settings.SMTP_USER and settings.SMTP_PASSWORD:
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+
         server.sendmail(settings.EMAIL_FROM, destinatarios, msg.as_string())
         server.quit()
         logger.info("E-mail enviado com sucesso para: %s", ", ".join(destinatarios))
         return True
+    except TimeoutError:
+        err_msg = f"Tempo limite esgotado ao conectar ao SMTP ({settings.SMTP_HOST}:{settings.SMTP_PORT}). A porta 587/465 pode estar bloqueada pelo firewall da sua rede."
+        logger.error("Falha ao enviar e-mail: %s", err_msg)
+        raise RuntimeError(err_msg)
+    except smtplib.SMTPAuthenticationError as e:
+        err_msg = "Falha de autenticação no Gmail. O Google exige uma 'Senha de App' de 16 caracteres (myaccount.google.com/apppasswords) em vez da senha comum."
+        logger.error("Falha ao enviar e-mail: %s (%s)", err_msg, e)
+        raise RuntimeError(err_msg)
     except Exception as e:
         logger.error("Falha ao enviar e-mail: %s", e, exc_info=True)
-        return False
+        raise RuntimeError(f"Erro no servidor SMTP: {str(e)}")
 

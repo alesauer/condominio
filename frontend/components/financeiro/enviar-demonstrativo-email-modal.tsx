@@ -155,7 +155,11 @@ export function EnviarDemonstrativoEmailModal({
         );
       }
       if (res.total_falhas > 0) {
-        toast.warning(`${res.total_falhas} envio(s) não puderam ser entregues.`);
+        const primeiroErro = res.destinatarios?.find((d: any) => d.status === "falha" && d.erro)?.erro;
+        toast.error(
+          `${res.total_falhas} envio(s) não entregue(s): ${primeiroErro || "Falha na conexão SMTP."}`,
+          { duration: 9000 }
+        );
       }
 
       onOpenChange(false);
