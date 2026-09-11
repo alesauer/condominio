@@ -31,11 +31,18 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen">
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
-      <div className={sidebarCollapsed ? "ml-16" : "ml-60"} style={{ transition: "margin-left 0.2s" }}>
-        <Header />
-        <main className="p-6">{children}</main>
+    <div className="min-h-screen bg-background print:bg-white">
+      <div className="print:hidden">
+        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      </div>
+      <div
+        className={`${sidebarCollapsed ? "ml-16" : "ml-60"} print:ml-0 print:m-0 print:p-0`}
+        style={{ transition: "margin-left 0.2s" }}
+      >
+        <div className="print:hidden">
+          <Header />
+        </div>
+        <main className="p-6 print:p-0 print:m-0">{children}</main>
       </div>
     </div>
   );

@@ -25,12 +25,14 @@ import {
   Plus,
   Trash2,
   Sparkles,
+  FileDown,
 } from "lucide-react";
 import {
   useSalvarAcoesEventos,
   useDeleteAcaoEvento,
   type DemonstrativoMensalResponse,
 } from "@/services/cobrancas.service";
+import { exportDemonstrativoPDF } from "@/lib/export-demonstrativo-pdf";
 import { toast } from "sonner";
 
 interface DemonstrativoMensalSheetProps {
@@ -118,6 +120,17 @@ export function DemonstrativoMensalSheet({
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleExportPDF = () => {
+    if (!data) return;
+    try {
+      exportDemonstrativoPDF(data);
+      toast.success("PDF profissional gerado e baixado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      toast.error("Erro ao gerar PDF. Tente novamente.");
+    }
   };
 
   const handleExportCSV = () => {
@@ -238,12 +251,20 @@ export function DemonstrativoMensalSheet({
             <span className="text-primary capitalize">{data.competencia_formatada}</span>
           </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleExportCSV}>
             <Download className="h-4 w-4 mr-1.5" /> Exportar CSV
           </Button>
-          <Button variant="default" size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-1.5" /> Imprimir / Salvar PDF
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1.5" /> Imprimir (Paisagem)
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleExportPDF}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+          >
+            <FileDown className="h-4 w-4 mr-1.5" /> Salvar PDF Profissional
           </Button>
         </div>
       </div>
