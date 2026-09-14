@@ -38,6 +38,8 @@ interface DestinatarioRow {
   responsavelNome: string;
   email: string;
   selected: boolean;
+  tipo?: "morador" | "inquilino" | "proprietario";
+  isAlugado?: boolean;
 }
 
 interface EnviarDemonstrativoEmailModalProps {
@@ -65,15 +67,45 @@ export function EnviarDemonstrativoEmailModal({
     const initialSubject = `Demonstrativo Mensal de Condomínio — ${data.competencia_formatada} — Residencial Monazita`;
     setAssunto(initialSubject);
 
-    const rows: DestinatarioRow[] = data.apartamentos_header.map((apto) => {
-      const email = apto.responsavel_email || "";
-      return {
-        apartamentoNumero: apto.numero,
-        bloco: apto.bloco,
-        responsavelNome: apto.responsavel_nome,
-        email,
-        selected: Boolean(email.trim()),
-      };
+    const rows: DestinatarioRow[] = [];
+    data.apartamentos_header.forEach((apto) => {
+      const respEmail = (apto.responsavel_email || "").trim();
+      const propEmail = (apto.proprietario_email || "").trim();
+      const isAlugado = Boolean(apto.is_alugado);
+      const propNome = apto.proprietario_nome || "Proprietário";
+
+      if (isAlugado && propEmail && propEmail !== respEmail) {
+        // 1. Inquilino (Morador)
+        rows.push({
+          apartamentoNumero: apto.numero,
+          bloco: apto.bloco,
+          responsavelNome: `${apto.responsavel_nome} (Inquilino)`,
+          email: respEmail,
+          selected: Boolean(respEmail),
+          tipo: "inquilino",
+          isAlugado: true,
+        });
+        // 2. Proprietário
+        rows.push({
+          apartamentoNumero: apto.numero,
+          bloco: apto.bloco,
+          responsavelNome: `${propNome} (Proprietário)`,
+          email: propEmail,
+          selected: Boolean(propEmail),
+          tipo: "proprietario",
+          isAlugado: true,
+        });
+      } else {
+        rows.push({
+          apartamentoNumero: apto.numero,
+          bloco: apto.bloco,
+          responsavelNome: apto.responsavel_nome,
+          email: respEmail,
+          selected: Boolean(respEmail),
+          tipo: "morador",
+          isAlugado: isAlugado,
+        });
+      }
     });
 
     setDestinatarios(rows);
@@ -267,7 +299,7 @@ export function EnviarDemonstrativoEmailModal({
             <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
               {destinatarios.map((row, idx) => (
                 <div
-                  key={row.apartamentoNumero}
+                  key={`${row.apartamentoNumero}-${row.tipo || idx}`}
                   onClick={() => handleToggleSelect(idx)}
                   className={`p-2.5 rounded-lg border transition-all cursor-pointer flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs ${
                     row.selected
@@ -275,18 +307,30 @@ export function EnviarDemonstrativoEmailModal({
                       : "bg-muted/10 border-border/70 hover:bg-muted/30 opacity-70"
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 min-w-[190px] select-none">
+                  <div className="flex items-center gap-2.5 min-w-[210px] select-none">
                     <Checkbox
                       checked={row.selected}
                       onCheckedChange={() => handleToggleSelect(idx)}
-                      id={`chk-${row.apartamentoNumero}`}
+                      id={`chk-${row.apartamentoNumero}-${row.tipo || idx}`}
                     />
                     <div>
-                      <span className="font-bold text-foreground block">
-                        Apto {row.apartamentoNumero}
-                        {row.bloco ? ` - ${row.bloco}` : ""}
-                      </span>
-                      <span className="text-[11px] text-muted-foreground block truncate max-w-[170px]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-bold text-foreground">
+                          Apto {row.apartamentoNumero}
+                          {row.bloco ? ` - ${row.bloco}` : ""}
+                        </span>
+                        {row.tipo === "inquilino" && (
+                          <Badge variant="outline" className="text-[9px] py-0 px-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20 font-semibold">
+                            Inquilino
+                          </Badge>
+                        )}
+                        {row.tipo === "proprietario" && (
+                          <Badge variant="outline" className="text-[9px] py-0 px-1 bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20 font-semibold">
+                            Proprietário
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-muted-foreground block truncate max-w-[190px]">
                         {row.responsavelNome || "Sem responsável cadastrado"}
                       </span>
                     </div>
@@ -298,7 +342,7 @@ export function EnviarDemonstrativoEmailModal({
                   >
                     <Input
                       type="email"
-                      placeholder="Adicionar e-mail do responsável..."
+                      placeholder="Adicionar e-mail..."
                       className={`h-8 text-xs transition-colors ${
                         row.selected && !row.email.trim()
                           ? "border-amber-400 focus-visible:ring-amber-400 bg-amber-50/20"
@@ -309,7 +353,7 @@ export function EnviarDemonstrativoEmailModal({
                     />
                     {row.selected && !row.email.trim() && (
                       <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium block mt-0.5">
-                        ⚠️ Preencha o e-mail para que esta unidade receba o demonstrativo.
+                        ⚠️ Preencha o e-mail para receber o demonstrativo.
                       </span>
                     )}
                   </div>

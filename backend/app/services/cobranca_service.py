@@ -1228,13 +1228,40 @@ async def enviar_email_demonstrativo(db: AsyncSession, data: Any, usuario=None) 
         valor_apto_str = f"R$ {cobranca_apto['valor_a_pagar']:.2f}".replace(".", ",") if cobranca_apto else ""
         venc_str = cobranca_apto["vencimento"].strftime('%d/%m/%Y') if cobranca_apto and cobranca_apto.get("vencimento") else f"10/{comp.month:02d}/{comp.year}"
 
+        is_alugado_unit = cobranca_apto.get("is_alugado") if cobranca_apto else False
+        is_proprietario_dest = "(Proprietário)" in nome_resp or (cobranca_apto and dest_email == cobranca_apto.get("proprietario_email"))
+        is_inquilino_dest = "(Inquilino)" in nome_resp or (cobranca_apto and dest_email == cobranca_apto.get("responsavel_email") and is_alugado_unit)
+
+        if is_alugado_unit and is_proprietario_dest:
+            val_cota = cobranca_apto.get("cota_proprietario") or 250.0
+            val_cota_str = f"R$ {val_cota:.2f}".replace(".", ",")
+            titulo_resumo = f"RESUMO DA COTA DO PROPRIETÁRIO (APTO {apto_num})"
+            linha_valor_texto = f"- Cota do Proprietário (Fundo de Reserva / Obras): {val_cota_str}\n- Total Geral do Imóvel: {valor_apto_str}"
+            linha_valor_html = f"""
+                <div>🟣 <strong>Cota do Proprietário (Fundo de Reserva / Obras):</strong> <span style="font-size: 16px; font-weight: bold; color: #6b21a8;">{val_cota_str}</span></div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Total Geral do Imóvel (com ordinárias do inquilino): {valor_apto_str}</div>
+            """
+        elif is_alugado_unit and is_inquilino_dest:
+            val_cota = cobranca_apto.get("cota_inquilino") or (cobranca_apto['valor_a_pagar'] - 250.0)
+            val_cota_str = f"R$ {val_cota:.2f}".replace(".", ",")
+            titulo_resumo = f"RESUMO DA COTA DO INQUILINO / LOCATÁRIO (APTO {apto_num})"
+            linha_valor_texto = f"- Cota do Inquilino (Despesas Ordinárias + Água + Gás): {val_cota_str}\n(O Fundo de Reserva é de responsabilidade exclusiva do Proprietário)"
+            linha_valor_html = f"""
+                <div>🔵 <strong>Cota do Inquilino (Despesas Ordinárias + Água + Gás):</strong> <span style="font-size: 16px; font-weight: bold; color: #0369a1;">{val_cota_str}</span></div>
+                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">* O Fundo de Reserva é faturado diretamente ao Proprietário conforme a Lei do Inquilinato. Total Imóvel: {valor_apto_str}</div>
+            """
+        else:
+            titulo_resumo = f"RESUMO DA SUA UNIDADE (APTO {apto_num})"
+            linha_valor_texto = f"- Valor do Condomínio: {valor_apto_str}" if valor_apto_str else ""
+            linha_valor_html = f'<div>💰 <strong>Valor do Condomínio:</strong> <span style="font-size: 16px; font-weight: bold; color: #0f2c59;">{valor_apto_str}</span></div>' if valor_apto_str else ''
+
         corpo_texto = f"""Olá, {nome_resp}!
 
 Segue em anexo o Demonstrativo Mensal de Fechamento do Condomínio Residencial Monazita referente à competência {comp_formatada}.
 
-Resumo da Unidade (Apto {apto_num}):
+{titulo_resumo}:
 - Vencimento: {venc_str}
-{f"- Valor a Pagar: {valor_apto_str}" if valor_apto_str else ""}
+{linha_valor_texto}
 
 {msg_custom if msg_custom else ""}
 
@@ -1272,9 +1299,9 @@ Administração do Condomínio Residencial Monazita
       <p>Informamos que o <strong>Demonstrativo Mensal Consolidado</strong> do condomínio relativo ao mês de <strong>{comp_formatada}</strong> já foi apurado e está disponível.</p>
       
       <div class="card">
-        <div style="font-weight: bold; font-size: 13px; margin-bottom: 8px; color: #0f2c59;">RESUMO DA SUA UNIDADE (APTO {apto_num})</div>
+        <div style="font-weight: bold; font-size: 13px; margin-bottom: 8px; color: #0f2c59;">{titulo_resumo}</div>
         <div>📅 <strong>Vencimento:</strong> {venc_str}</div>
-        {f'<div>💰 <strong>Valor do Condomínio:</strong> <span style="font-size: 16px; font-weight: bold; color: #0f2c59;">{valor_apto_str}</span></div>' if valor_apto_str else ''}
+        {linha_valor_html}
       </div>
 
       {f'<p style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 10px; border-radius: 6px; font-size: 13px; color: #6b21a8;"><strong>Mensagem da Administração:</strong><br>{msg_custom}</p>' if msg_custom else ''}
