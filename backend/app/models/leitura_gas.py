@@ -18,3 +18,7 @@ class LeituraGas(Base, BaseModelMixin):
     observacao = Column(Text, nullable=True)
 
     apartamento = relationship("Apartamento", back_populates="leituras_gas")
+
+    @property
+    def apartamento_numero(self) -> str | None:
+        return self.apartamento.numero if self.apartamento else None

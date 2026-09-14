@@ -1,6 +1,7 @@
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from app.models.leitura_gas import LeituraGas
 
@@ -45,12 +46,15 @@ async def create_leitura(db: AsyncSession, data: dict) -> LeituraGas:
     )
     db.add(leitura)
     await db.commit()
-    await db.refresh(leitura)
-    return leitura
+    return await get_leitura(db, str(leitura.id))
 
 
 async def get_leitura(db: AsyncSession, leitura_id: str) -> LeituraGas:
-    result = await db.execute(select(LeituraGas).where(LeituraGas.id == leitura_id))
+    result = await db.execute(
+        select(LeituraGas)
+        .options(selectinload(LeituraGas.apartamento))
+        .where(LeituraGas.id == leitura_id)
+    )
     l = result.scalar_one_or_none()
     if not l:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Leitura não encontrada")
@@ -58,7 +62,7 @@ async def get_leitura(db: AsyncSession, leitura_id: str) -> LeituraGas:
 
 
 async def list_leituras(db, page=1, page_size=20, apartamento_id=None, competencia=None):
-    query = select(LeituraGas)
+    query = select(LeituraGas).options(selectinload(LeituraGas.apartamento))
     if apartamento_id:
         query = query.where(LeituraGas.apartamento_id == apartamento_id)
     if competencia:

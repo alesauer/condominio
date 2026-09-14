@@ -21,6 +21,7 @@ class LeituraGasLoteCreate(BaseModel):
 class LeituraGasResponse(BaseModel):
     id: UUID
     apartamento_id: UUID
+    apartamento_numero: Optional[str] = None
     competencia: date
     leitura_anterior: Optional[float]
     leitura_atual: float
