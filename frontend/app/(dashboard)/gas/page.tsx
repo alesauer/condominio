@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { useSortableData } from "@/hooks/use-sortable-data";
 import { formatCurrency, formatDate, formatCompetencia } from "@/lib/utils";
 import { Plus } from "lucide-react";
 import type { PaginatedResponse } from "@/types";
+import type { Apartamento } from "@/types/apartamento";
 
 interface Leitura {
   id: string;
@@ -24,16 +25,36 @@ interface Leitura {
 
 export default function GasPage() {
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useQuery({
+  const { data, isLoading: loadingGas } = useQuery({
     queryKey: ["gas", page],
     queryFn: () => api.get<PaginatedResponse<Leitura>>(`/gas?page=${page}&page_size=20`).then(r => r.data),
   });
 
+  const { data: aptosData, isLoading: loadingAptos } = useQuery({
+    queryKey: ["apartamentos", "all"],
+    queryFn: () => api.get<PaginatedResponse<Apartamento>>("/apartamentos?page_size=100").then(r => r.data),
+  });
+
+  const aptosMap = useMemo(() => {
+    const map = new Map<string, string>();
+    aptosData?.items?.forEach(a => map.set(a.id, a.numero));
+    return map;
+  }, [aptosData]);
+
+  const itemsEnriched = useMemo(() => {
+    return (data?.items || []).map(l => ({
+      ...l,
+      apartamento_numero: l.apartamento_numero || aptosMap.get(l.apartamento_id) || "",
+    }));
+  }, [data?.items, aptosMap]);
+
   const { items: sortedItems, sortField, sortDirection, requestSort } = useSortableData(
-    data?.items || [],
+    itemsEnriched,
     "apartamento_numero",
     "asc"
   );
+
+  const isLoading = loadingGas || loadingAptos;
 
   return (
     <div className="space-y-4">
