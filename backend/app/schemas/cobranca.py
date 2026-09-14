@@ -41,6 +41,7 @@ class CobrancaGerarMensal(BaseModel):
     incluir_despesas: bool = Field(default=True, description="Somar despesas do mês e ratear")
     incluir_agua: bool = Field(default=True, description="Incluir rateio de água da competência se apurado")
     incluir_gas: bool = Field(default=True, description="Incluir consumo de gás da competência se apurado")
+    separar_fundo_proprietario: bool = Field(default=False, description="Gera cobrança separada do Fundo de Reserva para o Proprietário quando alugado")
     descricao: Optional[str] = Field(default=None, description="Descrição personalizada do lançamento (opcional)")
     acoes_eventos: Optional[List[DemonstrativoAcaoEventoInput]] = Field(default_factory=list, description="Ações e eventos realizados no mês")
 
@@ -55,12 +56,20 @@ class CobrancaPreviaApartamento(BaseModel):
     apartamento_numero: str
     apartamento_bloco: Optional[str] = None
     apartamento_tipo: Optional[str] = None
+    status: Optional[str] = "ocupado"
+    is_alugado: bool = False
+    proprietario_nome: Optional[str] = None
+    proprietario_email: Optional[str] = None
+    responsavel_nome: Optional[str] = None
+    responsavel_email: Optional[str] = None
     fracao_ideal: float
     valor_despesas: float = 0.0
     valor_agua: float = 0.0
     valor_gas: float = 0.0
     valor_fundo_reserva: float = 0.0
     valor_base: float = 0.0
+    cota_inquilino: float = 0.0
+    cota_proprietario: float = 0.0
     valor_total: float = 0.0
     ja_gerado: bool = False
 
@@ -96,6 +105,10 @@ class DemonstrativoApartamentoHeader(BaseModel):
     numero: str
     bloco: Optional[str] = None
     fracao_ideal: float
+    status: Optional[str] = "ocupado"
+    is_alugado: bool = False
+    proprietario_nome: Optional[str] = None
+    proprietario_email: Optional[str] = None
     responsavel_nome: str
     responsavel_email: Optional[str] = None
 
@@ -118,8 +131,15 @@ class DemonstrativoFundoReserva(BaseModel):
 class DemonstrativoCobrancaApto(BaseModel):
     apartamento_id: UUID
     apartamento_numero: str
+    bloco: Optional[str] = None
+    status_apartamento: Optional[str] = "ocupado"
+    is_alugado: bool = False
+    proprietario_nome: Optional[str] = None
+    proprietario_email: Optional[str] = None
     responsavel_nome: str
     responsavel_email: Optional[str] = None
+    cota_inquilino: Optional[float] = 0.0
+    cota_proprietario: Optional[float] = 0.0
     valor_a_pagar: float
     vencimento: date
     status: str

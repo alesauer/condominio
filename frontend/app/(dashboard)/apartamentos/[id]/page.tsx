@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Building2, Users, PlusCircle, Trash2, Phone, Mail } from "lucide-react";
+import { ArrowLeft, Building2, Users, PlusCircle, Trash2, Phone, Mail, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 const tipoLabel: Record<string, string> = {
@@ -292,6 +292,19 @@ export default function EditApartamentoPage() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Dica de Faturamento Legal para Imóvel Alugado */}
+                {(form.status === "alugado" || (form.responsavel_id && form.proprietario_id && form.responsavel_id !== form.proprietario_id)) && (
+                  <div className="p-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/30 text-xs space-y-1">
+                    <div className="font-semibold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      Regra de Cobrança Legal (Lei do Inquilinato nº 8.245/91):
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed">
+                      Ao gerar o lote mensal de cobranças, o sistema pode separar automaticamente as <strong>Despesas Ordinárias + Consumos (Água/Gás)</strong> para o Inquilino e o <strong>Fundo de Reserva / Obras</strong> para o Proprietário.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

@@ -514,6 +514,56 @@ class TestCobrancaService:
         assert res["total_valor"] == 880.0
         mock_db.commit.assert_awaited()
 
+    async def test_gerar_cobrancas_mensais_separar_fundo_alugado(self, mock_db):
+        from app.services import cobranca_service
+        from app.models.cobranca import Cobranca
+        from app.models.despesa import Despesa
+        from app.models.morador import Morador, TipoMorador
+
+        prop1 = Morador(id=uuid.uuid4(), nome="Proprietário 101", tipo=TipoMorador.proprietario)
+        inq1 = Morador(id=uuid.uuid4(), nome="Inquilino 101", tipo=TipoMorador.inquilino)
+        apto1 = Apartamento(
+            id=uuid.uuid4(),
+            numero="101",
+            status="alugado",
+            fracao_ideal=Decimal("1.0"),
+            proprietario=prop1,
+            responsavel=inq1,
+            proprietario_id=prop1.id,
+            responsavel_id=inq1.id,
+        )
+
+        desp1 = Despesa(id=uuid.uuid4(), descricao="Portaria", valor=Decimal("300.00"), competencia=date(2026, 9, 1), parcelamento=False)
+
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[apto1]), # aptos
+            make_mock_result(scalars_all_return=[desp1]), # despesas unicas
+            make_mock_result(scalars_all_return=[]), # despesas parcelas
+            make_mock_result(scalar_one_or_none_return=None), # rateio agua
+            make_mock_result(scalars_all_return=[]), # leituras gas
+            make_mock_result(scalars_all_return=[]), # existentes
+            make_mock_result(scalars_all_return=[]), # recarregadas
+        ]
+
+        data = {
+            "competencia": date(2026, 9, 1),
+            "vencimento": date(2026, 9, 10),
+            "valor_fundo_reserva": 250.0,
+            "incluir_despesas": True,
+            "incluir_agua": False,
+            "incluir_gas": False,
+            "separar_fundo_proprietario": True,
+        }
+
+        res = await cobranca_service.gerar_cobrancas_mensais(mock_db, data)
+        # Deve somar 300.00 (Inquilino) + 250.00 (Proprietário) = 550.00
+        assert res["total_despesas_mes"] == 300.0
+        assert res["total_fundo_reserva"] == 250.0
+        assert res["total_valor"] == 550.0
+        # Foram chamados 2 db.add (1 para inquilino e 1 para proprietario)
+        assert mock_db.add.call_count >= 2
+        mock_db.commit.assert_awaited()
+
     async def test_obter_demonstrativo_mensal(self, mock_db):
         from app.services import cobranca_service
         from app.models.despesa import Despesa

@@ -37,6 +37,11 @@ export interface CalculoApartamentoData {
     valorApto: number;
   };
   multaJuros?: number;
+  isAlugado?: boolean;
+  proprietarioNome?: string | null;
+  proprietarioEmail?: string | null;
+  cotaInquilino?: number;
+  cotaProprietario?: number;
   totalGeral: number;
   acoesEventos?: Array<{
     titulo: string;
@@ -91,7 +96,7 @@ export function exportCalculoApartamentoPDF(calc: CalculoApartamentoData) {
   doc.setFontSize(10);
   doc.setTextColor(15, 44, 89);
   doc.text(
-    `APARTAMENTO ${calc.apartamentoNumero}${calc.bloco ? ` - ${calc.bloco}` : ""}`,
+    `APARTAMENTO ${calc.apartamentoNumero}${calc.bloco ? ` - ${calc.bloco}` : ""}${calc.isAlugado ? " (IMÓVEL ALUGADO)" : ""}`,
     marginX + 4,
     currentY + 6
   );
@@ -99,17 +104,27 @@ export function exportCalculoApartamentoPDF(calc: CalculoApartamentoData) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Responsável: ${calc.responsavelNome}`, marginX + 4, currentY + 11);
-  doc.text(
-    `Fração Ideal Água: ${calc.fracaoAguaFormatada}  |  Fração Despesas: Rateio Igualitário (1/7)`,
-    marginX + 4,
-    currentY + 16
-  );
-  doc.text(
-    `Emissão do Extrato: ${new Date().toLocaleDateString("pt-BR")}`,
-    marginX + 4,
-    currentY + 21
-  );
+  if (calc.isAlugado && calc.proprietarioNome) {
+    doc.text(`Inquilino / Locatário: ${calc.responsavelNome}`, marginX + 4, currentY + 11);
+    doc.text(`Proprietário / Locador: ${calc.proprietarioNome}`, marginX + 4, currentY + 15);
+    doc.text(
+      `Fração Água: ${calc.fracaoAguaFormatada}  |  Despesas: Rateio Igual (1/7)`,
+      marginX + 4,
+      currentY + 19
+    );
+  } else {
+    doc.text(`Responsável: ${calc.responsavelNome}`, marginX + 4, currentY + 11);
+    doc.text(
+      `Fração Ideal Água: ${calc.fracaoAguaFormatada}  |  Fração Despesas: Rateio Igualitário (1/7)`,
+      marginX + 4,
+      currentY + 16
+    );
+    doc.text(
+      `Emissão do Extrato: ${new Date().toLocaleDateString("pt-BR")}`,
+      marginX + 4,
+      currentY + 21
+    );
+  }
 
   // Coluna 2: Vencimento, Status e Total
   const col2X = marginX + contentWidth - 4;
@@ -405,7 +420,82 @@ export function exportCalculoApartamentoPDF(calc: CalculoApartamentoData) {
     },
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 5;
+  currentY = (doc as any).lastAutoTable.finalY + 4;
+
+  // ── 5. TABELA DE REPARTIÇÃO LEGAL INQUILINO VS PROPRIETÁRIO ─────────────
+  if (calc.isAlugado) {
+    const cotaInq = calc.cotaInquilino ?? (
+      calc.totalDespesasComunsApto +
+      (calc.agua?.valorApto || 0) +
+      (calc.gas?.valorApto || 0)
+    );
+    const cotaProp = calc.cotaProprietario ?? calc.fundoReserva.valorApto;
+
+    const rowsDivisao = [
+      [
+        `COTA DO INQUILINO / LOCATÁRIO (${calc.responsavelNome})`,
+        "Despesas Ordinárias Comuns + Rateio de Água Copasa + Consumo Individual de Gás",
+        `R$ ${cotaInq.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ],
+      [
+        `COTA DO PROPRIETÁRIO / LOCADOR (${calc.proprietarioNome || "Proprietário"})`,
+        "Fundo de Reserva / Obras Extraordinárias (Art. 22 da Lei nº 8.245/91)",
+        `R$ ${cotaProp.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ],
+      [
+        "TOTAL DO IMÓVEL (SOMA DAS COTAS)",
+        "Valor global de responsabilidade condominial do imóvel",
+        `R$ ${(cotaInq + cotaProp).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ],
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: marginX, right: marginX },
+      head: [
+        [
+          {
+            content: "5. REPARTIÇÃO LEGAL DE RESPONSABILIDADES (LEI DO INQUILINATO Nº 8.245/91)",
+            colSpan: 3,
+            styles: { halign: "left", fillColor: [238, 242, 255], textColor: [49, 46, 129], fontStyle: "bold" },
+          },
+        ],
+        [
+          { content: "Destinatário Legal", styles: { halign: "left", fontStyle: "bold" } },
+          { content: "Composição da Responsabilidade", styles: { halign: "left", fontStyle: "bold" } },
+          { content: "Valor da Cota", styles: { halign: "right", fontStyle: "bold" } },
+        ],
+      ],
+      body: rowsDivisao,
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 1.8,
+        textColor: [30, 41, 59],
+        lineColor: [226, 232, 240],
+        lineWidth: 0.1,
+      },
+      headStyles: {
+        fillColor: [245, 247, 255],
+        textColor: [67, 56, 202],
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 65, fontStyle: "bold" },
+        1: { cellWidth: 82 },
+        2: { cellWidth: 35, halign: "right", fontStyle: "bold" },
+      },
+      didParseCell: (data) => {
+        if (data.row.index === rowsDivisao.length - 1) {
+          data.cell.styles.fillColor = [49, 46, 129];
+          data.cell.styles.textColor = [255, 255, 255];
+          data.cell.styles.fontSize = 8;
+          data.cell.styles.fontStyle = "bold";
+        }
+      },
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 4;
+  }
 
   // ── 7. SEÇÃO DE COMUNICADOS / AÇÕES REALIZADAS (SE HOUVER) ─────────────
   if (calc.acoesEventos && calc.acoesEventos.length > 0 && currentY < 250) {

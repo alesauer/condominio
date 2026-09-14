@@ -49,6 +49,7 @@ import {
   Building2,
   AlertCircle,
   Sparkles,
+  ShieldCheck,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -131,6 +132,7 @@ export default function CobrancasPage() {
     incluir_despesas: true,
     incluir_agua: true,
     incluir_gas: true,
+    separar_fundo_proprietario: true,
     descricao: "",
   });
 
@@ -233,6 +235,7 @@ export default function CobrancasPage() {
           incluir_despesas: formGerar.incluir_despesas,
           incluir_agua: formGerar.incluir_agua,
           incluir_gas: formGerar.incluir_gas,
+          separar_fundo_proprietario: formGerar.separar_fundo_proprietario,
         })
         .then((res) => setPrevia(res))
         .catch(() => setPrevia(null));
@@ -247,6 +250,7 @@ export default function CobrancasPage() {
     formGerar.incluir_despesas,
     formGerar.incluir_agua,
     formGerar.incluir_gas,
+    formGerar.separar_fundo_proprietario,
   ]);
 
   const handlePagar = async (id: string) => {
@@ -270,6 +274,7 @@ export default function CobrancasPage() {
         incluir_despesas: formGerar.incluir_despesas,
         incluir_agua: formGerar.incluir_agua,
         incluir_gas: formGerar.incluir_gas,
+        separar_fundo_proprietario: formGerar.separar_fundo_proprietario,
         descricao: formGerar.descricao || undefined,
         acoes_eventos: acoesEventos
           .filter((a) => a.titulo.trim() && a.descricao.trim())
@@ -426,11 +431,30 @@ export default function CobrancasPage() {
                       onCheckedChange={(v) => setFormGerar({ ...formGerar, incluir_gas: v })}
                     />
                   </div>
+
+                  {/* Separação de Fundo de Reserva para Proprietários em Imóveis Alugados */}
+                  <div className="flex items-center justify-between rounded-lg border p-3 bg-emerald-500/5 border-emerald-500/20">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-medium text-emerald-950 dark:text-emerald-200">
+                          Separar Fundo de Reserva para Proprietários (Alugados)
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Em imóveis alugados, gera 1 cobrança para o Inquilino (Ordinárias + Gás) e 1 cobrança separada para o Proprietário (Fundo de Reserva)
+                      </p>
+                    </div>
+                    <Switch
+                      checked={formGerar.separar_fundo_proprietario}
+                      onCheckedChange={(v) => setFormGerar({ ...formGerar, separar_fundo_proprietario: v })}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="valor_fundo_reserva">Valor do Fundo de Reserva (R$)</Label>
+                    <Label htmlFor="valor_fundo_reserva">Valor do Fundo de Reserva (R$ por Apto)</Label>
                     <Input
                       id="valor_fundo_reserva"
                       type="number"
@@ -568,11 +592,11 @@ export default function CobrancasPage() {
                         </div>
                       </div>
 
-                      <div className="max-h-48 overflow-y-auto rounded border text-xs">
+                      <div className="max-h-52 overflow-y-auto rounded border text-xs">
                         <table className="w-full">
                           <thead className="bg-muted/60 sticky top-0 border-b">
                             <tr>
-                              <th className="p-1.5 font-medium text-left">Apto</th>
+                              <th className="p-1.5 font-medium text-left">Apto / Ocupação</th>
                               <th className="p-1.5 font-medium text-right">Fração</th>
                               {formGerar.incluir_despesas && <th className="p-1.5 font-medium text-right">Despesas</th>}
                               {formGerar.incluir_agua && <th className="p-1.5 font-medium text-right">Água</th>}
@@ -585,11 +609,25 @@ export default function CobrancasPage() {
                             {previa.apartamentos.map((a) => (
                               <tr key={a.apartamento_id} className={a.ja_gerado ? "bg-amber-500/5" : ""}>
                                 <td className="p-1.5 font-medium">
-                                  Apto {a.apartamento_numero}
-                                  {a.ja_gerado && (
-                                    <span className="ml-1.5 text-[10px] text-amber-600 bg-amber-500/10 px-1 py-0.5 rounded">
-                                      Já Gerado
-                                    </span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>Apto {a.apartamento_numero}</span>
+                                    {a.is_alugado && (
+                                      <span className="text-[10px] text-blue-700 bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.2 rounded font-semibold">
+                                        Alugado
+                                      </span>
+                                    )}
+                                    {a.ja_gerado && (
+                                      <span className="text-[10px] text-amber-600 bg-amber-500/10 px-1 py-0.2 rounded">
+                                        Já Gerado
+                                      </span>
+                                    )}
+                                  </div>
+                                  {a.is_alugado && formGerar.separar_fundo_proprietario && Number(formGerar.valor_fundo_reserva) > 0 && (
+                                    <div className="text-[10px] text-muted-foreground pt-0.5">
+                                      <span className="text-blue-600 dark:text-blue-400 font-medium">Inq: {formatCurrency(a.cota_inquilino || 0)}</span>
+                                      <span className="mx-1">|</span>
+                                      <span className="text-purple-600 dark:text-purple-400 font-medium">Prop: {formatCurrency(a.cota_proprietario || 0)}</span>
+                                    </div>
                                   )}
                                 </td>
                                 <td className="p-1.5 text-right text-muted-foreground">

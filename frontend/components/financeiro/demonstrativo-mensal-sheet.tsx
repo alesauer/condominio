@@ -236,7 +236,7 @@ export function DemonstrativoMensalSheet({
       );
       rows.push([
         `"${item.descricao.replace(/"/g, '""')}"`,
-        `"${item.observacao.replace(/"/g, '""')}"`,
+        `"${(item.observacao || "").replace(/"/g, '""')}"`,
         item.valor.toFixed(2).replace(".", ","),
         ...aptoCols,
       ]);
@@ -531,17 +531,29 @@ export function DemonstrativoMensalSheet({
                       className="border-b border-blue-100 dark:border-blue-900/50 hover:bg-muted/30 transition-colors"
                     >
                       <td className="p-2.5 font-bold border-r border-blue-100 dark:border-blue-900/50 text-foreground">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenCalculoApto(c.apartamento_numero)}
-                          className="hover:underline text-primary hover:text-primary/80 font-bold transition-colors cursor-pointer text-left inline-flex items-center gap-1"
-                          title={`Ver memória de cálculo do Apto ${c.apartamento_numero}`}
-                        >
-                          <span>{c.apartamento_numero}</span>
-                        </button>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCalculoApto(c.apartamento_numero)}
+                            className="hover:underline text-primary hover:text-primary/80 font-bold transition-colors cursor-pointer text-left inline-flex items-center gap-1"
+                            title={`Ver memória de cálculo do Apto ${c.apartamento_numero}`}
+                          >
+                            <span>{c.apartamento_numero}</span>
+                          </button>
+                          {c.is_alugado && (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20 font-semibold">
+                              Alugado
+                            </Badge>
+                          )}
+                        </div>
                       </td>
-                      <td className="p-2.5 font-medium uppercase border-r border-blue-100 dark:border-blue-900/50 text-foreground">
-                        {c.responsavel_nome}
+                      <td className="p-2.5 font-medium border-r border-blue-100 dark:border-blue-900/50 text-foreground">
+                        <div className="uppercase">{c.responsavel_nome}</div>
+                        {c.is_alugado && c.proprietario_nome && (
+                          <div className="text-[10px] text-muted-foreground pt-0.5 normal-case">
+                            Proprietário: <span className="font-semibold">{c.proprietario_nome}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="p-2.5 text-right font-black text-sm border-r border-blue-100 dark:border-blue-900/50 text-rose-600 dark:text-rose-400">
                         {formatCurrency(c.valor_a_pagar)}

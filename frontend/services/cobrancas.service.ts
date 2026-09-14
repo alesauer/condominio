@@ -20,6 +20,7 @@ export interface GerarCobrancasPayload {
   incluir_despesas?: boolean;
   incluir_agua?: boolean;
   incluir_gas?: boolean;
+  separar_fundo_proprietario?: boolean;
   descricao?: string;
   acoes_eventos?: AcaoEventoPayload[];
 }
@@ -29,12 +30,20 @@ export interface CobrancaPreviaApartamento {
   apartamento_numero: string;
   apartamento_bloco: string | null;
   apartamento_tipo: string | null;
+  status?: string;
+  is_alugado?: boolean;
+  proprietario_nome?: string | null;
+  proprietario_email?: string | null;
+  responsavel_nome?: string | null;
+  responsavel_email?: string | null;
   fracao_ideal: number;
   valor_despesas: number;
   valor_agua: number;
   valor_gas: number;
   valor_fundo_reserva?: number;
   valor_base?: number;
+  cota_inquilino?: number;
+  cota_proprietario?: number;
   valor_total: number;
   ja_gerado: boolean;
 }
@@ -81,6 +90,7 @@ export function useGerarCobrancasMensais() {
           total_despesas_mes?: number;
           total_agua?: number;
           total_gas?: number;
+          total_fundo_reserva?: number;
           total_base?: number;
           total_valor: number;
         }>("/cobrancas/gerar-mensal", data)
@@ -102,8 +112,12 @@ export function usePreviaCobrancasMensais() {
 export interface DemonstrativoApartamentoHeader {
   id: string;
   numero: string;
-  bloco: string | null;
+  bloco?: string | null;
   fracao_ideal: number;
+  status?: string;
+  is_alugado?: boolean;
+  proprietario_nome?: string | null;
+  proprietario_email?: string | null;
   responsavel_nome: string;
   responsavel_email?: string | null;
 }
@@ -111,7 +125,7 @@ export interface DemonstrativoApartamentoHeader {
 export interface DemonstrativoDespesaItem {
   id?: string;
   descricao: string;
-  observacao: string;
+  observacao?: string;
   valor: number;
   rateio_por_apto: Record<string, number>;
 }
@@ -126,8 +140,15 @@ export interface DemonstrativoFundoReserva {
 export interface DemonstrativoCobrancaApto {
   apartamento_id: string;
   apartamento_numero: string;
+  bloco?: string | null;
+  status_apartamento?: string;
+  is_alugado?: boolean;
+  proprietario_nome?: string | null;
+  proprietario_email?: string | null;
   responsavel_nome: string;
   responsavel_email?: string | null;
+  cota_inquilino?: number;
+  cota_proprietario?: number;
   valor_a_pagar: number;
   vencimento: string;
   status: string;

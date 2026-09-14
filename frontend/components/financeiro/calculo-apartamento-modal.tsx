@@ -149,6 +149,18 @@ export function CalculoApartamentoModal({
         (gasInfo?.valorApto || 0) +
         fundoReservaValor;
 
+    const isAlugado = Boolean(
+      aptoHeader?.is_alugado ||
+      cobranca?.is_alugado ||
+      aptoHeader?.status === "alugado" ||
+      cobranca?.status_apartamento === "alugado"
+    );
+
+    const propNome = aptoHeader?.proprietario_nome || cobranca?.proprietario_nome || null;
+    const propEmail = aptoHeader?.proprietario_email || cobranca?.proprietario_email || null;
+    const cotaInquilino = cobranca?.cota_inquilino ?? (totalDespesasComunsApto + (aguaInfo?.valorApto || 0) + (gasInfo?.valorApto || 0));
+    const cotaProprietario = cobranca?.cota_proprietario ?? fundoReservaValor;
+
     return {
       apartamentoNumero,
       bloco: aptoHeader?.bloco || null,
@@ -156,6 +168,11 @@ export function CalculoApartamentoModal({
         cobranca?.responsavel_nome ||
         aptoHeader?.responsavel_nome ||
         `Morador Apto ${apartamentoNumero}`,
+      isAlugado,
+      proprietarioNome: propNome,
+      proprietarioEmail: propEmail,
+      cotaInquilino,
+      cotaProprietario,
       competenciaFormatada: data.competencia_formatada,
       vencimento: cobranca?.vencimento ? formatDate(cobranca.vencimento) : "10/" + data.competencia_formatada,
       status: cobranca?.status || "pendente",
@@ -270,7 +287,15 @@ export function CalculoApartamentoModal({
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  <strong className="text-foreground">Responsável:</strong> {aptoCalculo.responsavelNome}
+                  <strong className="text-foreground">
+                    {aptoCalculo.isAlugado ? "Inquilino / Locatário:" : "Responsável:"}
+                  </strong>{" "}
+                  {aptoCalculo.responsavelNome}
+                  {aptoCalculo.isAlugado && aptoCalculo.proprietarioNome && (
+                    <span className="block pt-0.5">
+                      <strong className="text-foreground">Proprietário (Locador):</strong> {aptoCalculo.proprietarioNome}
+                    </span>
+                  )}
                 </p>
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
@@ -300,6 +325,66 @@ export function CalculoApartamentoModal({
                 </span>
               </div>
             </div>
+
+            {/* ── CARD DESTACADO: DIVISÃO DE RESPONSABILIDADE (LEI DO INQUILINATO) ── */}
+            {aptoCalculo.isAlugado && (
+              <div className="rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/70 via-purple-50/50 to-pink-50/40 dark:from-indigo-950/40 dark:via-purple-950/30 dark:to-pink-950/20 p-4 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    <div>
+                      <h4 className="text-sm font-bold text-indigo-950 dark:text-indigo-200">
+                        Divisão de Responsabilidade Legal (Lei do Inquilinato nº 8.245/91)
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Fundo de Reserva é de obrigação do proprietário; despesas ordinárias e consumos são do locatário
+                      </p>
+                    </div>
+                  </div>
+                  <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
+                    Imóvel Alugado
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Cota Inquilino */}
+                  <div className="p-3 rounded-lg border border-blue-200 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/40 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                        🔵 Cota do Inquilino / Morador
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[130px]" title={aptoCalculo.responsavelNome}>
+                        {aptoCalculo.responsavelNome}
+                      </span>
+                    </div>
+                    <div className="text-xl font-black font-mono text-blue-700 dark:text-blue-300">
+                      {formatCurrency(aptoCalculo.cotaInquilino ?? (aptoCalculo.totalDespesasComunsApto + (aptoCalculo.agua?.valorApto || 0) + (aptoCalculo.gas?.valorApto || 0)))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      Despesas ordinárias de consumo e rotina: Despesas Comuns ({formatCurrency(aptoCalculo.totalDespesasComunsApto)}) + Água ({formatCurrency(aptoCalculo.agua?.valorApto || 0)}) + Gás ({formatCurrency(aptoCalculo.gas?.valorApto || 0)}).
+                    </p>
+                  </div>
+
+                  {/* Cota Proprietário */}
+                  <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-900/60 bg-purple-50/80 dark:bg-purple-950/40 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800 dark:text-purple-300">
+                        🟣 Cota do Proprietário / Locador
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[130px]" title={aptoCalculo.proprietarioNome || "Proprietário"}>
+                        {aptoCalculo.proprietarioNome || "Proprietário"}
+                      </span>
+                    </div>
+                    <div className="text-xl font-black font-mono text-purple-700 dark:text-purple-300">
+                      {formatCurrency(aptoCalculo.cotaProprietario ?? aptoCalculo.fundoReserva.valorApto)}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      Fundo de Reserva / Obras extraordinárias ({formatCurrency(aptoCalculo.fundoReserva.valorApto)}). Exclusivo do proprietário conforme Art. 22 da Lei 8.245/91.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ── 1. DESPESAS ORDINÁRIAS COMUNS (RATEIO IGUAL) ───────────────── */}
             <div className="rounded-lg border overflow-hidden shadow-xs">

@@ -135,7 +135,14 @@ async def _calcular_componentes_cobranca(
         valor_fundo_reserva = valor_base_condominio
 
     # 1. Carrega todos os apartamentos
-    aptos_result = await db.execute(select(Apartamento).order_by(Apartamento.numero))
+    aptos_result = await db.execute(
+        select(Apartamento)
+        .options(
+            selectinload(Apartamento.proprietario),
+            selectinload(Apartamento.responsavel),
+        )
+        .order_by(Apartamento.numero)
+    )
     apartamentos = aptos_result.scalars().all()
 
     if not apartamentos:
@@ -308,18 +315,39 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
         v_tot = (v_desp + v_agua + v_gas + v_fundo_apto).quantize(Decimal("0.01"))
         total_geral += v_tot
 
+        is_alugado = (
+            str(apto.status.value if hasattr(apto.status, "value") else apto.status).lower() == "alugado"
+            or (apto.responsavel_id is not None and apto.proprietario_id is not None and apto.responsavel_id != apto.proprietario_id)
+        )
+        prop_nome = apto.proprietario.nome if apto.proprietario else None
+        prop_email = apto.proprietario.email if apto.proprietario else None
+        resp_nome = apto.responsavel.nome if apto.responsavel else (prop_nome or f"Apto {apto.numero}")
+        resp_email = apto.responsavel.email if apto.responsavel else prop_email
+
+        cota_inquilino = (v_desp + v_agua + v_gas).quantize(Decimal("0.01"))
+        cota_proprietario = v_fundo_apto.quantize(Decimal("0.01"))
+
         tipo_str = str(apto.tipo.value) if hasattr(apto.tipo, "value") else str(apto.tipo)
+        status_str = str(apto.status.value) if hasattr(apto.status, "value") else str(apto.status)
         detalhes_aptos.append({
             "apartamento_id": apto.id,
             "apartamento_numero": apto.numero,
             "apartamento_bloco": apto.bloco,
             "apartamento_tipo": tipo_str,
+            "status": status_str,
+            "is_alugado": is_alugado,
+            "proprietario_nome": prop_nome,
+            "proprietario_email": prop_email,
+            "responsavel_nome": resp_nome,
+            "responsavel_email": resp_email,
             "fracao_ideal": float(fracoes_map.get(apto.id, Decimal("0.0"))),
             "valor_despesas": float(v_desp),
             "valor_agua": float(v_agua),
             "valor_gas": float(v_gas),
             "valor_fundo_reserva": float(v_fundo_apto),
             "valor_base": float(v_fundo_apto),
+            "cota_inquilino": float(cota_inquilino),
+            "cota_proprietario": float(cota_proprietario),
             "valor_total": float(v_tot),
             "ja_gerado": apto.id in existentes_apto_ids,
         })
@@ -344,6 +372,7 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
     incluir_despesas: bool = data.get("incluir_despesas", True)
     incluir_agua: bool = data.get("incluir_agua", True)
     incluir_gas: bool = data.get("incluir_gas", True)
+    separar_fundo: bool = bool(data.get("separar_fundo_proprietario", False))
     descricao_custom: str = data.get("descricao")
 
     calc = await _calcular_componentes_cobranca(
@@ -380,38 +409,91 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         v_fundo_apto = valor_fundo
         valor_total_apto = (v_desp + v_agua + v_gas + v_fundo_apto).quantize(Decimal("0.01"))
 
-        # Monta detalhamento das parcelas para a descrição
-        partes = []
-        if v_desp > 0:
-            partes.append(f"Desp: R$ {v_desp:.2f}")
-        if v_agua > 0:
-            partes.append(f"Água: R$ {v_agua:.2f}")
-        if v_gas > 0:
-            partes.append(f"Gás: R$ {v_gas:.2f}")
-        if v_fundo_apto > 0:
-            partes.append(f"Fundo Reserva: R$ {v_fundo_apto:.2f}")
-
-        detalhe_str = f" ({' | '.join(partes)})" if partes else ""
-
-        if descricao_custom:
-            desc = f"{descricao_custom} - Apto {apto.numero}{detalhe_str}"
-        else:
-            desc = f"Taxa Condominial Apto {apto.numero} - Ref. {comp_formatada}{detalhe_str}"
-
-        cobranca = Cobranca(
-            apartamento_id=apto.id,
-            descricao=desc,
-            competencia=competencia,
-            vencimento=vencimento,
-            valor=valor_total_apto,
-            multa=Decimal("0.00"),
-            juros=Decimal("0.00"),
-            valor_total=valor_total_apto,
-            status=StatusFinanceiro.pendente,
+        is_alugado = (
+            str(apto.status.value if hasattr(apto.status, "value") else apto.status).lower() == "alugado"
+            or (apto.responsavel_id is not None and apto.proprietario_id is not None and apto.responsavel_id != apto.proprietario_id)
         )
-        db.add(cobranca)
-        geradas.append(cobranca)
-        total_valor += valor_total_apto
+
+        if separar_fundo and is_alugado and v_fundo_apto > 0:
+            # 1. Cobrança Inquilino (Despesas Ordinárias + Gás)
+            v_inq = (v_desp + v_agua + v_gas).quantize(Decimal("0.01"))
+            partes_inq = []
+            if v_desp > 0:
+                partes_inq.append(f"Desp: R$ {v_desp:.2f}")
+            if v_agua > 0:
+                partes_inq.append(f"Água: R$ {v_agua:.2f}")
+            if v_gas > 0:
+                partes_inq.append(f"Gás: R$ {v_gas:.2f}")
+            detalhe_inq = f" ({' | '.join(partes_inq)})" if partes_inq else ""
+            inq_nome = apto.responsavel.nome if apto.responsavel else "Inquilino"
+
+            desc_inq = f"Taxa Condominial Apto {apto.numero} (Inquilino: {inq_nome}) - Ref. {comp_formatada}{detalhe_inq}"
+            cobranca_inq = Cobranca(
+                apartamento_id=apto.id,
+                descricao=desc_inq,
+                competencia=competencia,
+                vencimento=vencimento,
+                valor=v_inq,
+                multa=Decimal("0.00"),
+                juros=Decimal("0.00"),
+                valor_total=v_inq,
+                status=StatusFinanceiro.pendente,
+            )
+            db.add(cobranca_inq)
+            geradas.append(cobranca_inq)
+            total_valor += v_inq
+
+            # 2. Cobrança Proprietário (Fundo de Reserva)
+            v_prop = v_fundo_apto.quantize(Decimal("0.01"))
+            prop_nome = apto.proprietario.nome if apto.proprietario else "Proprietário"
+            desc_prop = f"Fundo de Reserva Apto {apto.numero} (Proprietário: {prop_nome}) - Ref. {comp_formatada} (Fundo Reserva: R$ {v_fundo_apto:.2f})"
+            cobranca_prop = Cobranca(
+                apartamento_id=apto.id,
+                descricao=desc_prop,
+                competencia=competencia,
+                vencimento=vencimento,
+                valor=v_prop,
+                multa=Decimal("0.00"),
+                juros=Decimal("0.00"),
+                valor_total=v_prop,
+                status=StatusFinanceiro.pendente,
+            )
+            db.add(cobranca_prop)
+            geradas.append(cobranca_prop)
+            total_valor += v_prop
+        else:
+            # Cobrança Única Consolidada
+            partes = []
+            if v_desp > 0:
+                partes.append(f"Desp: R$ {v_desp:.2f}")
+            if v_agua > 0:
+                partes.append(f"Água: R$ {v_agua:.2f}")
+            if v_gas > 0:
+                partes.append(f"Gás: R$ {v_gas:.2f}")
+            if v_fundo_apto > 0:
+                partes.append(f"Fundo Reserva: R$ {v_fundo_apto:.2f}")
+
+            detalhe_str = f" ({' | '.join(partes)})" if partes else ""
+
+            if descricao_custom:
+                desc = f"{descricao_custom} - Apto {apto.numero}{detalhe_str}"
+            else:
+                desc = f"Taxa Condominial Apto {apto.numero} - Ref. {comp_formatada}{detalhe_str}"
+
+            cobranca = Cobranca(
+                apartamento_id=apto.id,
+                descricao=desc,
+                competencia=competencia,
+                vencimento=vencimento,
+                valor=valor_total_apto,
+                multa=Decimal("0.00"),
+                juros=Decimal("0.00"),
+                valor_total=valor_total_apto,
+                status=StatusFinanceiro.pendente,
+            )
+            db.add(cobranca)
+            geradas.append(cobranca)
+            total_valor += valor_total_apto
 
     # Salva ações e eventos informados para o mês
     acoes_input = data.get("acoes_eventos") or []
@@ -499,12 +581,19 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
         f = Decimal(str(apto.fracao_ideal)) if apto.fracao_ideal and Decimal(str(apto.fracao_ideal)) > 0 else Decimal("0.142857")
         fracoes_map[apto.id] = f
 
+        prop_nome = apto.proprietario.nome if apto.proprietario else None
+        prop_email = apto.proprietario.email if apto.proprietario else None
+        is_alugado = (
+            str(apto.status.value if hasattr(apto.status, "value") else apto.status).lower() == "alugado"
+            or (apto.responsavel_id is not None and apto.proprietario_id is not None and apto.responsavel_id != apto.proprietario_id)
+        )
+
         resp_email = None
         if apto.responsavel and apto.responsavel.nome:
             resp_nome = apto.responsavel.nome
             resp_email = apto.responsavel.email
         elif apto.proprietario and apto.proprietario.nome:
-            resp_nome = f"{apto.proprietario.nome} (PROPRIETÁRIO)"
+            resp_nome = f"{apto.proprietario.nome}"
             resp_email = apto.proprietario.email
         elif apto.moradores:
             nomes = [m.morador.nome for m in apto.moradores if m.morador and m.morador.nome]
@@ -523,6 +612,10 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
             "numero": apto.numero,
             "bloco": apto.bloco,
             "fracao_ideal": float(f),
+            "status": str(apto.status.value if hasattr(apto.status, "value") else apto.status),
+            "is_alugado": is_alugado,
+            "proprietario_nome": prop_nome,
+            "proprietario_email": prop_email,
             "responsavel_nome": resp_nome,
             "responsavel_email": resp_email,
         })
@@ -654,6 +747,16 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
 
     if cobrancas_por_apto:
         for apto in apartamentos:
+            is_alugado = (
+                str(apto.status.value if hasattr(apto.status, "value") else apto.status).lower() == "alugado"
+                or (apto.responsavel_id is not None and apto.proprietario_id is not None and apto.responsavel_id != apto.proprietario_id)
+            )
+            prop_nome = apto.proprietario.nome if apto.proprietario else None
+            prop_email = apto.proprietario.email if apto.proprietario else None
+            status_apto = str(apto.status.value if hasattr(apto.status, "value") else apto.status)
+            cota_inq = float(total_despesas_por_apto.get(apto.numero, Decimal("0.00")))
+            cota_prop = float(valor_fundo_unitario)
+
             c = cobrancas_por_apto.get(apto.id)
             if c:
                 val = Decimal(str(c.valor_total if c.valor_total and c.valor_total > 0 else c.valor))
@@ -664,8 +767,15 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                 cobrancas_moradores.append({
                     "apartamento_id": apto.id,
                     "apartamento_numero": apto.numero,
+                    "bloco": apto.bloco,
+                    "status_apartamento": status_apto,
+                    "is_alugado": is_alugado,
+                    "proprietario_nome": prop_nome,
+                    "proprietario_email": prop_email,
                     "responsavel_nome": responsaveis_map[apto.id],
                     "responsavel_email": responsaveis_email_map.get(apto.id),
+                    "cota_inquilino": cota_inq,
+                    "cota_proprietario": cota_prop,
                     "valor_a_pagar": float(val),
                     "vencimento": c.vencimento,
                     "status": c.status.value if hasattr(c.status, "value") else str(c.status),
@@ -676,8 +786,15 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                 cobrancas_moradores.append({
                     "apartamento_id": apto.id,
                     "apartamento_numero": apto.numero,
+                    "bloco": apto.bloco,
+                    "status_apartamento": status_apto,
+                    "is_alugado": is_alugado,
+                    "proprietario_nome": prop_nome,
+                    "proprietario_email": prop_email,
                     "responsavel_nome": responsaveis_map[apto.id],
                     "responsavel_email": responsaveis_email_map.get(apto.id),
+                    "cota_inquilino": cota_inq,
+                    "cota_proprietario": cota_prop,
                     "valor_a_pagar": float(total_despesas_por_apto[apto.numero] + valor_fundo_unitario),
                     "vencimento": date(competencia.year, competencia.month, 10),
                     "status": "pendente",
@@ -695,18 +812,33 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
         )
         for apto in apartamentos:
             apto_id = apto.id
-            val = (
+            is_alugado = (
+                str(apto.status.value if hasattr(apto.status, "value") else apto.status).lower() == "alugado"
+                or (apto.responsavel_id is not None and apto.proprietario_id is not None and apto.responsavel_id != apto.proprietario_id)
+            )
+            prop_nome = apto.proprietario.nome if apto.proprietario else None
+            prop_email = apto.proprietario.email if apto.proprietario else None
+            status_apto = str(apto.status.value if hasattr(apto.status, "value") else apto.status)
+            cota_inq = float(
                 calc["despesas_map"].get(apto_id, Decimal("0.00"))
                 + calc["agua_map"].get(apto_id, Decimal("0.00"))
                 + calc["gas_map"].get(apto_id, Decimal("0.00"))
-                + valor_fundo_unitario
             )
+            cota_prop = float(valor_fundo_unitario)
+            val = Decimal(str(cota_inq + cota_prop))
             total_cobrancas_mes += val
             cobrancas_moradores.append({
                 "apartamento_id": apto_id,
                 "apartamento_numero": apto.numero,
+                "bloco": apto.bloco,
+                "status_apartamento": status_apto,
+                "is_alugado": is_alugado,
+                "proprietario_nome": prop_nome,
+                "proprietario_email": prop_email,
                 "responsavel_nome": responsaveis_map.get(apto_id, "—"),
                 "responsavel_email": responsaveis_email_map.get(apto_id),
+                "cota_inquilino": cota_inq,
+                "cota_proprietario": cota_prop,
                 "valor_a_pagar": float(val),
                 "vencimento": vencimento_padrao,
                 "status": "pendente",
