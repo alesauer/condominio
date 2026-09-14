@@ -26,7 +26,7 @@ export function SortableHeader({
 
   return (
     <th
-      className={`p-3 font-semibold select-none cursor-pointer transition-colors hover:text-foreground hover:bg-muted/70 ${
+      className={`h-11 px-4 text-xs font-semibold uppercase tracking-wider select-none cursor-pointer transition-colors text-slate-500 hover:text-slate-900 hover:bg-slate-100/50 ${
         align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left"
       } ${className}`}
       onClick={() => onSort(field)}
@@ -44,14 +44,15 @@ export function SortableHeader({
         <span>{children}</span>
         {isSorted ? (
           direction === "asc" ? (
-            <ArrowUp className="h-3.5 w-3.5 text-primary shrink-0 transition-transform" />
+            <ArrowUp className="h-3.5 w-3.5 text-primary-600 shrink-0" />
           ) : (
-            <ArrowDown className="h-3.5 w-3.5 text-primary shrink-0 transition-transform" />
+            <ArrowDown className="h-3.5 w-3.5 text-primary-600 shrink-0" />
           )
         ) : (
-          <ArrowUpDown className="h-3.5 w-3.5 opacity-40 hover:opacity-100 shrink-0 transition-opacity" />
+          <ArrowUpDown className="h-3.5 w-3.5 opacity-40 hover:opacity-100 shrink-0" />
         )}
       </div>
     </th>
   );
 }
+

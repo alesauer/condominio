@@ -65,6 +65,14 @@ const MESES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+const statusLabel: Record<string, string> = {
+  pago: "Pago",
+  pendente: "Pendente",
+  atrasado: "Atrasado",
+  cancelado: "Cancelado",
+};
+
+
 interface AcaoEventoFormItem {
   id?: string;
   titulo: string;
@@ -319,36 +327,38 @@ export default function CobrancasPage() {
   return (
     <div className="space-y-6">
       {/* Cabeçalho Principal */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 print:hidden">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Cobranças e Demonstrativo Mensal</h1>
-          <p className="text-muted-foreground">
-            Visualização consolidada de fechamento por mês e emissão de cobranças por apartamento
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Cobranças e Demonstrativo Mensal
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Fechamento consolidado do mês e emissão de cobranças detalhadas por apartamento
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Seletor de Competência (Mês / Ano) */}
-          <div className="flex items-center bg-card border rounded-md p-1 shadow-sm">
+          <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-2xs">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 text-slate-600 hover:text-slate-900"
               onClick={handlePrevMonth}
               title="Mês Anterior"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-1.5 px-2">
-              <Calendar className="h-3.5 w-3.5 text-primary" />
-              <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">
+            <div className="flex items-center gap-1.5 px-3">
+              <Calendar className="h-3.5 w-3.5 text-primary-600" />
+              <span className="font-semibold text-xs sm:text-sm text-slate-800 whitespace-nowrap">
                 {MESES[selectedMonth - 1]} de {selectedYear}
               </span>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 text-slate-600 hover:text-slate-900"
               onClick={handleNextMonth}
               title="Próximo Mês"
             >
@@ -359,19 +369,21 @@ export default function CobrancasPage() {
           {/* Modal de Geração de Cobranças */}
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Gerar Lote do Mês
+              <Button className="gap-2 shadow-xs">
+                <PlusCircle className="h-4 w-4" />
+                <span>Gerar Lote do Mês</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5 text-primary" /> Gerar Lote de Cobranças do Mês
+                <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                  <Calculator className="h-5 w-5 text-primary-600" /> Gerar Lote de Cobranças do Mês
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-xs text-slate-500">
                   Consolidação automática: soma as despesas do mês divididas igualmente, rateio de água por fração ideal, consumo individual de gás e valor do fundo de reserva por apartamento.
                 </DialogDescription>
               </DialogHeader>
+
 
               <form onSubmit={handleGerarMensal} className="space-y-4 py-2">
                 <div className="grid grid-cols-2 gap-4">
@@ -735,33 +747,37 @@ export default function CobrancasPage() {
       </div>
 
       {/* Alternância de Abas: Demonstrativo Mensal vs Lista */}
-      <div className="flex items-center justify-between gap-2 border-b pb-2 print:hidden">
-        <div className="flex items-center gap-1 bg-muted/60 p-1 rounded-lg">
-          <Button
-            variant={viewMode === "demonstrativo" ? "default" : "ghost"}
-            size="sm"
-            className="text-xs h-8 gap-1.5"
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
+          <button
             onClick={() => setViewMode("demonstrativo")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              viewMode === "demonstrativo"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            <FileSpreadsheet className="h-4 w-4" />
-            Demonstrativo Mensal (Planilha Fechamento)
-          </Button>
-          <Button
-            variant={viewMode === "lista" ? "default" : "ghost"}
-            size="sm"
-            className="text-xs h-8 gap-1.5"
+            <FileSpreadsheet className="h-4 w-4 text-primary-600" />
+            <span>Demonstrativo Mensal (Planilha Fechamento)</span>
+          </button>
+          <button
             onClick={() => setViewMode("lista")}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              viewMode === "lista"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
           >
-            <List className="h-4 w-4" />
-            Lista Individual de Cobranças
-          </Button>
+            <List className="h-4 w-4 text-primary-600" />
+            <span>Lista Individual de Cobranças</span>
+          </button>
         </div>
 
         {viewMode === "lista" && (
           <div className="flex items-center gap-2">
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-[170px] h-8 text-xs">
-                <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground" />
+              <SelectTrigger className="w-[170px] h-9 text-xs bg-white">
+                <Filter className="mr-1.5 h-3.5 w-3.5 text-slate-400" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -790,16 +806,16 @@ export default function CobrancasPage() {
         <>
           {isLoading ? (
             <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
               ))}
             </div>
           ) : (
             <>
-              <div className="rounded-md border overflow-x-auto bg-card shadow-sm">
+              <div className="rounded-xl border border-slate-200 overflow-x-auto bg-white shadow-card">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-muted/50 text-left">
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-left">
                       <SortableHeader field="apartamento_numero" currentField={sortField} direction={sortDirection} onSort={requestSort}>
                         Apartamento
                       </SortableHeader>
@@ -824,10 +840,12 @@ export default function CobrancasPage() {
                       <SortableHeader field="status" currentField={sortField} direction={sortDirection} onSort={requestSort} align="center">
                         Status
                       </SortableHeader>
-                      <th className="p-3 font-medium text-right">Ações</th>
+                      <th className="h-11 px-4 text-xs font-semibold uppercase tracking-wider text-slate-500 text-right">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-slate-100">
                     {sortedItems.map((c) => {
                       const multaJuros = (c.multa || 0) + (c.juros || 0);
                       const isPago = c.status === "pago";
@@ -837,51 +855,52 @@ export default function CobrancasPage() {
                         : "-";
 
                       return (
-                        <tr key={c.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="p-3 font-semibold text-foreground whitespace-nowrap">
+                        <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">
                             {c.apartamento_numero ? (
                               <button
                                 type="button"
                                 onClick={() => handleOpenCalculoApto(c.apartamento_numero, c.competencia)}
-                                className="inline-flex items-center gap-1.5 text-primary hover:text-primary/80 font-bold hover:underline transition-colors group cursor-pointer text-left"
+                                className="inline-flex items-center gap-1.5 text-primary-600 hover:text-primary-800 font-bold hover:underline transition-colors group cursor-pointer text-left"
                                 title={`Clique para ver a memória de cálculo do ${aptoDisplay}`}
                               >
-                                <Building2 className="h-3.5 w-3.5 text-primary/70 group-hover:scale-110 transition-transform" />
+                                <Building2 className="h-3.5 w-3.5 text-primary-600/80 group-hover:scale-110 transition-transform" />
                                 <span>{aptoDisplay}</span>
                               </button>
                             ) : (
                               aptoDisplay
                             )}
                           </td>
-                          <td className="p-3 font-medium text-muted-foreground">
+                          <td className="px-4 py-3.5 font-medium text-slate-600">
                             {c.descricao}
                           </td>
-                          <td className="p-3 whitespace-nowrap">{formatDate(c.competencia)}</td>
-                          <td className="p-3 whitespace-nowrap">{formatDate(c.vencimento)}</td>
-                          <td className="p-3 text-right">{formatCurrency(c.valor)}</td>
-                          <td className="p-3 text-right">{multaJuros > 0 ? formatCurrency(multaJuros) : "—"}</td>
-                          <td className="p-3 text-right font-bold text-primary">{formatCurrency(c.valor_total)}</td>
-                          <td className="p-3 text-center">
+                          <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">{formatDate(c.competencia)}</td>
+                          <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">{formatDate(c.vencimento)}</td>
+                          <td className="px-4 py-3.5 text-right text-slate-700 font-medium">{formatCurrency(c.valor)}</td>
+                          <td className="px-4 py-3.5 text-right text-slate-500">{multaJuros > 0 ? formatCurrency(multaJuros) : "—"}</td>
+                          <td className="px-4 py-3.5 text-right font-bold text-slate-900">{formatCurrency(c.valor_total)}</td>
+                          <td className="px-4 py-3.5 text-center">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                              className={`status-pill ${
                                 isPago
-                                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                                  ? "status-pill-pago"
                                   : isAtrasado
-                                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold"
-                                  : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20"
+                                  ? "status-pill-atrasado"
+                                  : "status-pill-pendente"
                               }`}
                             >
-                              {c.status}
+                              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              <span>{statusLabel[c.status] || c.status}</span>
                             </span>
                           </td>
-                          <td className="p-3 text-right">
+                          <td className="px-4 py-3.5 text-right">
                             <div className="flex items-center justify-end gap-2">
                               {c.apartamento_numero && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleOpenCalculoApto(c.apartamento_numero, c.competencia)}
-                                  className="h-8 px-2 text-xs gap-1 text-primary hover:bg-primary/10 hover:text-primary"
+                                  className="h-8 px-2 text-xs gap-1 text-primary-600 hover:bg-primary-50"
                                   title="Visualizar cálculo detalhado do condomínio"
                                 >
                                   <Calculator className="h-3.5 w-3.5" />
@@ -891,13 +910,13 @@ export default function CobrancasPage() {
                               {c.status !== "pago" && (
                                 <>
                                   <Button
-                                    variant="outline"
+                                    variant="secondary"
                                     size="sm"
                                     onClick={() => handlePagar(c.id)}
                                     disabled={pagarMut.isPending}
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs text-emerald-700 hover:text-emerald-800"
                                   >
-                                    <CheckCircle className="mr-1 h-3.5 w-3.5 text-emerald-500" />
+                                    <CheckCircle className="mr-1 h-3.5 w-3.5 text-emerald-600" />
                                     Pagar
                                   </Button>
                                   <Button
@@ -905,7 +924,7 @@ export default function CobrancasPage() {
                                     size="icon"
                                     onClick={() => handleDeleteCobranca(c.id, aptoDisplay)}
                                     disabled={deleteMut.isPending}
-                                    className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
                                     title="Excluir cobrança pendente"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -913,7 +932,7 @@ export default function CobrancasPage() {
                                 </>
                               )}
                               {c.status === "pago" && c.data_pagamento && (
-                                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                <span className="text-xs text-slate-500 whitespace-nowrap">
                                   Pago em {formatDate(c.data_pagamento)}
                                 </span>
                               )}
@@ -924,7 +943,7 @@ export default function CobrancasPage() {
                     })}
                     {sortedItems.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={9} className="py-10 text-center text-sm text-slate-400">
                           Nenhuma cobrança encontrada para os filtros selecionados.
                         </td>
                       </tr>
@@ -932,6 +951,7 @@ export default function CobrancasPage() {
                   </tbody>
                 </table>
               </div>
+
 
               {data && data.total_pages > 1 && (
                 <div className="flex items-center justify-between pt-2">

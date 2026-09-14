@@ -1,17 +1,16 @@
-"use client";
+"use client"
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from "react"
 import {
   usePlanilhaGas,
   useSalvarLoteGas,
   type LeituraGasPlanilhaItem,
-} from "@/services/gas.service";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrency } from "@/lib/utils";
+} from "@/services/gas.service"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent } from "@/components/ui/card"
+import { formatCurrency } from "@/lib/utils"
 import {
   Flame,
   Calendar,
@@ -21,79 +20,76 @@ import {
   RotateCcw,
   Building2,
   CheckCircle2,
-  AlertCircle,
   Sparkles,
   Layers,
   HelpCircle,
-} from "lucide-react";
-import { toast } from "sonner";
+} from "lucide-react"
+import { toast } from "sonner"
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-];
+]
 
 function parseNumber(value: any): number {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === "number") return isNaN(value) ? 0 : value;
-  const str = String(value).trim().replace(",", ".");
-  if (str === "") return 0;
-  const num = parseFloat(str);
-  return isNaN(num) ? 0 : num;
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return isNaN(value) ? 0 : value
+  const str = String(value).trim().replace(",", ".")
+  if (str === "") return 0
+  const num = parseFloat(str)
+  return isNaN(num) ? 0 : num
 }
 
 interface RowState {
-  apartamento_id: string;
-  apartamento_numero: string;
-  apartamento_bloco?: string | null;
-  leitura_anterior: string;
-  leitura_atual: string;
-  valor_unitario: string;
-  observacao: string;
-  leitura_id?: string | null;
-  isDirty?: boolean;
+  apartamento_id: string
+  apartamento_numero: string
+  apartamento_bloco?: string | null
+  leitura_anterior: string
+  leitura_atual: string
+  valor_unitario: string
+  observacao: string
+  leitura_id?: string | null
+  isDirty?: boolean
 }
 
 export default function GasPage() {
-  const today = new Date();
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const today = new Date()
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1)
 
-  const competenciaParam = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
+  const competenciaParam = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
 
   const handlePrevMonth = () => {
-    setHasUnsavedChanges(false);
+    setHasUnsavedChanges(false)
     if (selectedMonth === 1) {
-      setSelectedMonth(12);
-      setSelectedYear((y) => y - 1);
+      setSelectedMonth(12)
+      setSelectedYear((y) => y - 1)
     } else {
-      setSelectedMonth((m) => m - 1);
+      setSelectedMonth((m) => m - 1)
     }
-  };
+  }
 
   const handleNextMonth = () => {
-    setHasUnsavedChanges(false);
+    setHasUnsavedChanges(false)
     if (selectedMonth === 12) {
-      setSelectedMonth(1);
-      setSelectedYear((y) => y + 1);
+      setSelectedMonth(1)
+      setSelectedYear((y) => y + 1)
     } else {
-      setSelectedMonth((m) => m + 1);
+      setSelectedMonth((m) => m + 1)
     }
-  };
+  }
 
-  // Queries e Mutations
-  const { data: planilhaData, isLoading, refetch } = usePlanilhaGas(competenciaParam);
-  const salvarMut = useSalvarLoteGas();
+  const { data: planilhaData, isLoading, refetch } = usePlanilhaGas(competenciaParam)
+  const salvarMut = useSalvarLoteGas()
 
-  const [valorUnitarioPadrao, setValorUnitarioPadrao] = useState("19.95");
-  const [rows, setRows] = useState<RowState[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [valorUnitarioPadrao, setValorUnitarioPadrao] = useState("19.95")
+  const [rows, setRows] = useState<RowState[]>([])
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-  // Sincroniza estado local quando os dados da planilha chegam da API
   useEffect(() => {
     if (planilhaData && !hasUnsavedChanges) {
-      const defaultUnit = planilhaData.valor_unitario_padrao || 19.95;
-      setValorUnitarioPadrao(String(defaultUnit));
+      const defaultUnit = planilhaData.valor_unitario_padrao || 19.95
+      setValorUnitarioPadrao(String(defaultUnit))
 
       const newRows: RowState[] = planilhaData.itens.map((item) => ({
         apartamento_id: item.apartamento_id,
@@ -105,44 +101,41 @@ export default function GasPage() {
         observacao: item.observacao || "",
         leitura_id: item.leitura_id,
         isDirty: false,
-      }));
+      }))
 
-      setRows(newRows);
+      setRows(newRows)
     }
-  }, [planilhaData, hasUnsavedChanges]);
+  }, [planilhaData, hasUnsavedChanges])
 
-  // Atualiza campo específico de uma linha
   const handleCellChange = (
     index: number,
     field: "leitura_anterior" | "leitura_atual" | "valor_unitario" | "observacao",
     value: string
   ) => {
     setRows((prev) => {
-      const next = [...prev];
+      const next = [...prev]
       next[index] = {
         ...next[index],
         [field]: value,
         isDirty: true,
-      };
-      return next;
-    });
-    setHasUnsavedChanges(true);
-  };
+      }
+      return next
+    })
+    setHasUnsavedChanges(true)
+  }
 
-  // Atualiza o valor unitário global e propaga para linhas que usam o valor padrão
   const handleValorUnitarioPadraoChange = (newVal: string) => {
-    setValorUnitarioPadrao(newVal);
+    setValorUnitarioPadrao(newVal)
     setRows((prev) =>
       prev.map((r) => ({
         ...r,
         valor_unitario: newVal,
         isDirty: true,
       }))
-    );
-    setHasUnsavedChanges(true);
-  };
+    )
+    setHasUnsavedChanges(true)
+  }
 
-  // Ação rápida: Copiar Leitura Anterior como Leitura Atual para quem está vazio
   const handlePreencherSemConsumo = () => {
     setRows((prev) =>
       prev.map((r) => {
@@ -151,49 +144,48 @@ export default function GasPage() {
             ...r,
             leitura_atual: r.leitura_anterior,
             isDirty: true,
-          };
+          }
         }
-        return r;
+        return r
       })
-    );
-    setHasUnsavedChanges(true);
-    toast.info("Leituras anteriores replicadas como leitura atual para apartamentos vazios.");
-  };
+    )
+    setHasUnsavedChanges(true)
+    toast.info("Leituras anteriores replicadas como leitura atual para apartamentos sem alteração.")
+  }
 
-  // Cálculos dinâmicos por linha e totais
   const calculatedRows = useMemo(() => {
-    let totalConsumo = 0;
-    let totalValor = 0;
-    let preenchidosCount = 0;
+    let totalConsumo = 0
+    let totalValor = 0
+    let preenchidosCount = 0
 
-    const unitPadrao = parseNumber(valorUnitarioPadrao) || 19.95;
+    const unitPadrao = parseNumber(valorUnitarioPadrao) || 19.95
 
     const items = rows.map((r) => {
-      const ant = parseNumber(r.leitura_anterior);
-      const rawAtual = String(r.leitura_atual ?? "").trim();
-      const hasAtual = rawAtual !== "";
-      const atual = parseNumber(rawAtual);
-      const unit = parseNumber(r.valor_unitario) || unitPadrao;
+      const ant = parseNumber(r.leitura_anterior)
+      const rawAtual = String(r.leitura_atual ?? "").trim()
+      const hasAtual = rawAtual !== ""
+      const atual = parseNumber(rawAtual)
+      const unit = parseNumber(r.valor_unitario) || unitPadrao
 
-      let consumo = 0;
-      let valorCobrado = 0;
+      let consumo = 0
+      let valorCobrado = 0
 
       if (hasAtual) {
-        consumo = Math.max(0, atual - ant);
-        valorCobrado = Math.round(consumo * unit * 100) / 100;
-        preenchidosCount++;
+        consumo = Math.max(0, atual - ant)
+        valorCobrado = Math.round(consumo * unit * 100) / 100
+        preenchidosCount++
       }
 
-      totalConsumo += consumo;
-      totalValor += valorCobrado;
+      totalConsumo += consumo
+      totalValor += valorCobrado
 
       return {
         ...r,
         consumoCalculado: consumo,
         valorCobradoCalculado: valorCobrado,
         hasAtual,
-      };
-    });
+      }
+    })
 
     return {
       items,
@@ -201,10 +193,9 @@ export default function GasPage() {
       totalValor: Math.round(totalValor * 100) / 100,
       preenchidosCount,
       totalAptos: rows.length,
-    };
-  }, [rows, valorUnitarioPadrao]);
+    }
+  }, [rows, valorUnitarioPadrao])
 
-  // Salvar Lote
   const handleSalvar = async () => {
     try {
       const payload = {
@@ -213,42 +204,40 @@ export default function GasPage() {
         leituras: rows
           .filter((r) => String(r.leitura_atual ?? "").trim() !== "")
           .map((r) => {
-            const ant = parseNumber(r.leitura_anterior);
-            const atual = parseNumber(r.leitura_atual);
-            const unit = parseNumber(r.valor_unitario) || parseNumber(valorUnitarioPadrao) || 19.95;
+            const ant = parseNumber(r.leitura_anterior)
+            const atual = parseNumber(r.leitura_atual)
+            const unit = parseNumber(r.valor_unitario) || parseNumber(valorUnitarioPadrao) || 19.95
             return {
               apartamento_id: r.apartamento_id,
               leitura_anterior: ant,
               leitura_atual: atual,
               valor_unitario: unit,
               observacao: r.observacao?.trim() || undefined,
-            };
+            }
           }),
-      };
+      }
 
-      await salvarMut.mutateAsync(payload);
-      toast.success("Leituras de gás salvas com sucesso!");
-      setHasUnsavedChanges(false);
-      refetch();
+      await salvarMut.mutateAsync(payload)
+      toast.success("Leituras de gás salvas com sucesso!")
+      setHasUnsavedChanges(false)
+      refetch()
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || "Erro ao salvar leituras de gás.");
+      toast.error(err?.response?.data?.detail || "Erro ao salvar leituras de gás.")
     }
-  };
+  }
 
-  // Atalho de Teclado Ctrl+S / Cmd+S
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        handleSalvar();
+        e.preventDefault()
+        handleSalvar()
       }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [rows, valorUnitarioPadrao, competenciaParam]);
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [rows, valorUnitarioPadrao, competenciaParam])
 
-  // Ref para navegação com teclado
-  const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const inputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
 
   const handleKeyDownInput = (
     e: React.KeyboardEvent<HTMLInputElement>,
@@ -256,64 +245,59 @@ export default function GasPage() {
     field: "anterior" | "atual"
   ) => {
     if (e.key === "Enter" || e.key === "ArrowDown") {
-      e.preventDefault();
-      const nextIndex = index + 1;
-      const target = inputRefs.current[`${field}-${nextIndex}`];
+      e.preventDefault()
+      const nextIndex = index + 1
+      const target = inputRefs.current[`${field}-${nextIndex}`]
       if (target) {
-        target.focus();
-        target.select();
+        target.focus()
+        target.select()
       }
     } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const prevIndex = index - 1;
-      const target = inputRefs.current[`${field}-${prevIndex}`];
+      e.preventDefault()
+      const prevIndex = index - 1
+      const target = inputRefs.current[`${field}-${prevIndex}`]
       if (target) {
-        target.focus();
-        target.select();
+        target.focus()
+        target.select()
       }
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
-      {/* Cabeçalho Principal */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-amber-500/10 text-amber-600 rounded-lg">
-              <Flame className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Leituras de Gás</h1>
-              <p className="text-sm text-muted-foreground">
-                Planilha interativa de medição por apartamento com cálculo automático de consumo e valor
-              </p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Consumo e Leituras de Gás
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Planilha interativa de medição por apartamento com cálculo em tempo real
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Seletor de Competência (Mês / Ano) */}
-          <div className="flex items-center bg-card border rounded-md p-1 shadow-sm">
+          <div className="flex items-center bg-white border border-slate-200 rounded-lg p-1 shadow-2xs">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 text-slate-600 hover:text-slate-900"
               onClick={handlePrevMonth}
               title="Mês Anterior"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <div className="flex items-center gap-1.5 px-3">
-              <Calendar className="h-3.5 w-3.5 text-primary" />
-              <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">
+              <Calendar className="h-3.5 w-3.5 text-primary-600" />
+              <span className="font-semibold text-xs sm:text-sm text-slate-800 whitespace-nowrap">
                 {MESES[selectedMonth - 1]} de {selectedYear}
               </span>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 text-slate-600 hover:text-slate-900"
               onClick={handleNextMonth}
               title="Próximo Mês"
             >
@@ -321,20 +305,20 @@ export default function GasPage() {
             </Button>
           </div>
 
-          {/* Botão Salvar Leituras */}
+          {/* Botão Salvar */}
           <Button
             onClick={handleSalvar}
             disabled={salvarMut.isPending}
-            className={`gap-1.5 ${
+            className={`gap-2 shadow-xs ${
               hasUnsavedChanges
-                ? "bg-amber-600 hover:bg-amber-700 text-white shadow-md animate-pulse"
+                ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
                 : ""
             }`}
           >
             <Save className="h-4 w-4" />
-            {salvarMut.isPending ? "Salvando..." : "Salvar Leituras"}
+            <span>{salvarMut.isPending ? "Salvando..." : "Salvar Leituras"}</span>
             {hasUnsavedChanges && (
-              <span className="ml-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-bold">
+              <span className="ml-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-bold">
                 Ctrl+S
               </span>
             )}
@@ -342,114 +326,118 @@ export default function GasPage() {
         </div>
       </div>
 
-      {/* Barra de Controles e Resumo de Totais */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Controle do Preço do m³ */}
-        <div className="p-3.5 rounded-xl border bg-card/80 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Preço do m³ (R$)
-            </span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-              Taxa Geral
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <span className="text-sm font-semibold text-muted-foreground">R$</span>
-            <Input
-              type="text"
-              inputMode="decimal"
-              className="h-9 text-base font-bold bg-background text-foreground"
-              value={valorUnitarioPadrao}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (/^[0-9.,]*$/.test(val)) {
-                  handleValorUnitarioPadraoChange(val);
-                }
-              }}
-              placeholder="19.95"
-            />
-          </div>
-        </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Unit Price */}
+        <Card className="border border-slate-200 shadow-card bg-white">
+          <CardContent className="p-4 flex flex-col justify-between space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Preço do m³
+              </span>
+              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                Tarifa GLP
+              </span>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-sm font-bold text-slate-500">R$</span>
+              <Input
+                type="text"
+                inputMode="decimal"
+                className="h-9 text-base font-bold bg-white text-slate-900"
+                value={valorUnitarioPadrao}
+                onChange={(e) => {
+                  const val = e.target.value
+                  if (/^[0-9.,]*$/.test(val)) {
+                    handleValorUnitarioPadraoChange(val)
+                  }
+                }}
+                placeholder="19.95"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Consumo Total do Mês */}
-        <div className="p-3.5 rounded-xl border bg-amber-500/5 border-amber-500/20 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-xs font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-              <Flame className="h-3.5 w-3.5 text-amber-500" /> Consumo Total do Mês
-            </span>
-            <span className="text-[11px] text-amber-700/80 dark:text-amber-300/80">Soma Geral</span>
-          </div>
-          <div className="pt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-amber-600 dark:text-amber-400">
-              {calculatedRows.totalConsumo.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-            </span>
-            <span className="text-xs font-bold text-amber-700/80 dark:text-amber-300/80">m³</span>
-          </div>
-        </div>
+        {/* Consumo Total */}
+        <Card className="border border-slate-200 shadow-card bg-white">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Consumo Total</p>
+              <div className="flex items-baseline gap-1 mt-1">
+                <span className="text-2xl font-bold text-amber-600">
+                  {calculatedRows.totalConsumo.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-xs font-bold text-amber-600">m³</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">Medição do mês</p>
+            </div>
+            <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg">
+              <Flame className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Valor Total a Faturar */}
-        <div className="p-3.5 rounded-xl border bg-primary/5 border-primary/20 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-xs font-semibold text-primary flex items-center gap-1.5">
-              <Building2 className="h-3.5 w-3.5 text-primary" /> Total a Cobrar
-            </span>
-            <span className="text-[11px] text-primary/70">Rateado</span>
-          </div>
-          <div className="pt-1">
-            <span className="text-2xl font-black text-primary">
-              {formatCurrency(calculatedRows.totalValor)}
-            </span>
-          </div>
-        </div>
+        {/* Total a Cobrar */}
+        <Card className="border border-slate-200 shadow-card bg-white">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total a Cobrar</p>
+              <h3 className="text-2xl font-bold text-primary-600 mt-1">
+                {formatCurrency(calculatedRows.totalValor)}
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">Rateio apurado</p>
+            </div>
+            <div className="p-2.5 bg-primary-50 text-primary-600 rounded-lg">
+              <Building2 className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Status de Preenchimento */}
-        <div className="p-3.5 rounded-xl border bg-card/80 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-1">
-            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-blue-500" /> Apartamentos
-            </span>
-            {hasUnsavedChanges ? (
-              <Badge variant="outline" className="text-[10px] text-amber-600 bg-amber-500/10 border-amber-500/30">
-                Não salvo
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-[10px] text-emerald-600 bg-emerald-500/10 border-emerald-500/30">
-                Sincronizado
-              </Badge>
-            )}
-          </div>
-          <div className="pt-1 flex items-center justify-between">
-            <span className="text-sm font-bold text-foreground">
-              {calculatedRows.preenchidosCount} de {calculatedRows.totalAptos} lançados
-            </span>
+        {/* Preenchimento */}
+        <Card className="border border-slate-200 shadow-card bg-white">
+          <CardContent className="p-4 flex flex-col justify-between space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Lançamentos</span>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  hasUnsavedChanges
+                    ? "text-amber-700 bg-amber-50 border border-amber-200"
+                    : "text-emerald-700 bg-emerald-50 border border-emerald-200"
+                }`}
+              >
+                {hasUnsavedChanges ? "Não salvo" : "Sincronizado"}
+              </span>
+            </div>
+            <div className="text-sm font-bold text-slate-900 pt-1">
+              {calculatedRows.preenchidosCount} de {calculatedRows.totalAptos} preenchidos
+            </div>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={handlePreencherSemConsumo}
-              className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground"
+              className="h-7 text-[11px] px-2 text-slate-500 hover:text-slate-900 justify-start"
               title="Preenche Leitura Atual igual à Leitura Anterior para os apartamentos vazios"
             >
               <RotateCcw className="h-3 w-3 mr-1" /> Replicar sem consumo
             </Button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Tabela Interativa de Planilha */}
+      {/* Spreadsheet Table */}
       {isLoading ? (
         <div className="space-y-2">
           {[...Array(7)].map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full" />
+            <Skeleton key={i} className="h-12 w-full rounded-lg" />
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/60 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4 text-left">Apartamento</th>
                   <th className="py-3 px-3 text-center">Competência</th>
                   <th className="py-3 px-3 text-right w-36">Leitura Ant. (m³)</th>
@@ -460,28 +448,27 @@ export default function GasPage() {
                   <th className="py-3 px-3 text-center w-24">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/60">
+              <tbody className="divide-y divide-slate-100">
                 {calculatedRows.items.map((row, idx) => {
-                  const hasConsumo = row.consumoCalculado > 0;
-                  const isFilled = row.hasAtual;
+                  const hasConsumo = row.consumoCalculado > 0
+                  const isFilled = row.hasAtual
 
                   return (
                     <tr
                       key={row.apartamento_id}
-                      className={`transition-colors group hover:bg-muted/30 ${
-                        hasConsumo ? "bg-amber-500/[0.03]" : ""
+                      className={`hover:bg-slate-50/70 transition-colors ${
+                        hasConsumo ? "bg-amber-50/20" : ""
                       }`}
                     >
-                      {/* Apartamento */}
-                      <td className="py-2.5 px-4 font-semibold text-foreground whitespace-nowrap">
+                      <td className="py-2.5 px-4 font-semibold text-slate-900 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <div className="h-7 w-7 rounded-md bg-muted/80 flex items-center justify-center text-xs font-bold text-primary group-hover:bg-primary/10 transition-colors">
+                          <div className="h-7 w-7 rounded-md bg-slate-100 flex items-center justify-center text-xs font-bold text-primary-600 border border-slate-200">
                             {row.apartamento_numero}
                           </div>
                           <div>
                             <span className="font-bold">Apto {row.apartamento_numero}</span>
                             {row.apartamento_bloco && (
-                              <span className="text-xs text-muted-foreground ml-1">
+                              <span className="text-xs text-slate-500 ml-1">
                                 ({row.apartamento_bloco})
                               </span>
                             )}
@@ -489,23 +476,21 @@ export default function GasPage() {
                         </div>
                       </td>
 
-                      {/* Competência */}
-                      <td className="py-2.5 px-3 text-center text-xs text-muted-foreground whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-center text-xs text-slate-500 whitespace-nowrap">
                         {String(selectedMonth).padStart(2, "0")}/{selectedYear}
                       </td>
 
-                      {/* Leitura Anterior */}
                       <td className="py-2.5 px-3 text-right">
                         <Input
-                          ref={(el) => { inputRefs.current[`anterior-${idx}`] = el; }}
+                          ref={(el) => { inputRefs.current[`anterior-${idx}`] = el }}
                           type="text"
                           inputMode="decimal"
-                          className="h-8 text-right text-xs font-mono font-medium bg-background/80 border-muted-foreground/30 focus-visible:ring-1"
+                          className="h-8 text-right text-xs font-mono font-medium bg-slate-50 border-slate-200"
                           value={row.leitura_anterior}
                           onChange={(e) => {
-                            const val = e.target.value;
+                            const val = e.target.value
                             if (/^[0-9.,]*$/.test(val)) {
-                              handleCellChange(idx, "leitura_anterior", val);
+                              handleCellChange(idx, "leitura_anterior", val)
                             }
                           }}
                           onKeyDown={(e) => handleKeyDownInput(e, idx, "anterior")}
@@ -513,38 +498,36 @@ export default function GasPage() {
                         />
                       </td>
 
-                      {/* Leitura Atual */}
                       <td className="py-2.5 px-3 text-right">
                         <Input
-                          ref={(el) => { inputRefs.current[`atual-${idx}`] = el; }}
+                          ref={(el) => { inputRefs.current[`atual-${idx}`] = el }}
                           type="text"
                           inputMode="decimal"
-                          className={`h-8 text-right text-xs font-mono font-bold bg-background focus-visible:ring-2 focus-visible:ring-primary ${
+                          className={`h-8 text-right text-xs font-mono font-bold bg-white ${
                             isFilled
-                              ? "border-primary/50 text-foreground"
-                              : "border-dashed border-muted-foreground/40 text-muted-foreground"
+                              ? "border-primary-400 text-slate-900"
+                              : "border-dashed border-slate-300 text-slate-400"
                           }`}
                           value={row.leitura_atual}
                           onChange={(e) => {
-                            const val = e.target.value;
+                            const val = e.target.value
                             if (/^[0-9.,]*$/.test(val)) {
-                              handleCellChange(idx, "leitura_atual", val);
+                              handleCellChange(idx, "leitura_atual", val)
                             }
                           }}
                           onKeyDown={(e) => handleKeyDownInput(e, idx, "atual")}
-                          placeholder="Digite a leitura..."
+                          placeholder="Leitura..."
                           autoFocus={idx === 0}
                         />
                       </td>
 
-                      {/* Consumo Calculado */}
                       <td className="py-2.5 px-3 text-right whitespace-nowrap">
                         {isFilled ? (
                           <span
                             className={`inline-flex items-center px-2 py-0.5 rounded font-mono font-bold text-xs ${
                               hasConsumo
-                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
-                                : "text-muted-foreground"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "text-slate-400"
                             }`}
                           >
                             {row.consumoCalculado.toLocaleString("pt-BR", {
@@ -554,73 +537,62 @@ export default function GasPage() {
                             m³
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground/50">—</span>
+                          <span className="text-xs text-slate-400">—</span>
                         )}
                       </td>
 
-                      {/* Valor Unitário */}
                       <td className="py-2.5 px-3 text-right">
-                        <span className="text-xs text-muted-foreground font-mono">
+                        <span className="text-xs text-slate-600 font-mono">
                           {formatCurrency(parseNumber(row.valor_unitario) || parseNumber(valorUnitarioPadrao) || 19.95)}
                         </span>
                       </td>
 
-                      {/* Total Cobrado */}
                       <td className="py-2.5 px-4 text-right whitespace-nowrap">
                         {isFilled ? (
                           <span
                             className={`font-mono text-sm ${
                               hasConsumo
-                                ? "font-extrabold text-emerald-600 dark:text-emerald-400"
-                                : "font-medium text-muted-foreground"
+                                ? "font-bold text-emerald-600"
+                                : "font-medium text-slate-400"
                             }`}
                           >
                             {formatCurrency(row.valorCobradoCalculado)}
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground/50 font-mono">R$ 0,00</span>
+                          <span className="text-xs text-slate-400 font-mono">R$ 0,00</span>
                         )}
                       </td>
 
-                      {/* Status */}
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
                         {row.isDirty ? (
-                          <Badge variant="outline" className="text-[10px] text-amber-600 bg-amber-500/10 border-amber-500/30">
+                          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 border border-amber-200">
                             Editado
-                          </Badge>
+                          </span>
                         ) : isFilled ? (
-                          <span className="inline-flex items-center text-[11px] text-emerald-600 dark:text-emerald-400 gap-1 font-medium">
+                          <span className="inline-flex items-center text-[11px] text-emerald-600 gap-1 font-semibold">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Salvo
                           </span>
                         ) : (
-                          <span className="text-[11px] text-muted-foreground/60">Pendente</span>
+                          <span className="text-[11px] text-slate-400">Pendente</span>
                         )}
                       </td>
                     </tr>
-                  );
+                  )
                 })}
-
-                {calculatedRows.items.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground text-sm">
-                      Nenhum apartamento encontrado para exibir na planilha.
-                    </td>
-                  </tr>
-                )}
               </tbody>
 
-              {/* Rodapé da Planilha com Totais Consolidados */}
+              {/* Summary Footer */}
               {calculatedRows.items.length > 0 && (
                 <tfoot>
-                  <tr className="border-t-2 border-border bg-muted/40 font-semibold text-xs">
-                    <td className="py-3 px-4 font-bold text-foreground" colSpan={4}>
+                  <tr className="border-t-2 border-slate-200 bg-slate-50/90 font-semibold text-xs text-slate-800">
+                    <td className="py-3 px-4 font-bold text-slate-900" colSpan={4}>
                       <div className="flex items-center justify-between">
                         <span>TOTAL GERAL ({calculatedRows.totalAptos} Apartamentos)</span>
-                        <span className="text-muted-foreground font-normal">Soma das medições apuradas:</span>
+                        <span className="text-slate-500 font-normal">Soma das medições apuradas:</span>
                       </div>
                     </td>
                     <td className="py-3 px-3 text-right">
-                      <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+                      <span className="font-mono font-bold text-amber-600 text-sm">
                         {calculatedRows.totalConsumo.toLocaleString("pt-BR", {
                           minimumFractionDigits: 0,
                           maximumFractionDigits: 2,
@@ -628,9 +600,9 @@ export default function GasPage() {
                         m³
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-right text-muted-foreground">—</td>
+                    <td className="py-3 px-3 text-right text-slate-400">—</td>
                     <td className="py-3 px-4 text-right">
-                      <span className="font-mono font-extrabold text-primary text-base">
+                      <span className="font-mono font-extrabold text-primary-600 text-base">
                         {formatCurrency(calculatedRows.totalValor)}
                       </span>
                     </td>
@@ -652,14 +624,14 @@ export default function GasPage() {
         </div>
       )}
 
-      {/* Dica de Utilização */}
-      <div className="flex items-start gap-2 text-xs text-muted-foreground p-3 rounded-lg border bg-muted/20">
-        <HelpCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+      {/* Productivity Helper Tip */}
+      <div className="flex items-start gap-2.5 text-xs text-slate-600 p-3.5 rounded-lg border border-slate-200 bg-white shadow-card">
+        <HelpCircle className="h-4 w-4 text-primary-600 shrink-0 mt-0.5" />
         <div>
-          <span className="font-semibold text-foreground">Dica de Produtividade: </span>
-          Digite a Leitura Atual e pressione <kbd className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">Enter</kbd> ou <kbd className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">↓ Seta para Baixo</kbd> para pular rapidamente para o próximo apartamento. Pressione <kbd className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">Ctrl + S</kbd> a qualquer momento para salvar todas as alterações.
+          <span className="font-semibold text-slate-900">Dica de Produtividade: </span>
+          Digite a Leitura Atual e pressione <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-700">Enter</kbd> ou <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-700">↓ Seta para Baixo</kbd> para navegar na planilha. Pressione <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-700">Ctrl + S</kbd> a qualquer momento para salvar.
         </div>
       </div>
     </div>
-  );
+  )
 }
