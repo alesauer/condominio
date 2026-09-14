@@ -50,6 +50,8 @@ class ReceitaResponse(BaseModel):
     comprovante_url: Optional[str] = None
     comprovante_nome: Optional[str] = None
     apartamento_id: Optional[UUID]
+    apartamento_numero: Optional[str] = None
+    apartamento_bloco: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -82,4 +84,22 @@ class VerificarDuplicacaoResponse(BaseModel):
     ano_origem: int
     mes_destino: int
     ano_destino: int
+
+
+class SincronizarReceitasRequest(BaseModel):
+    competencia: Optional[str] = None
+    mes: Optional[int] = None
+    ano: Optional[int] = None
+    vencimento: Optional[date] = None
+
+
+class SincronizarReceitasResponse(BaseModel):
+    competencia: str
+    competencia_formatada: str
+    total_receitas: int
+    total_valor: float
+    novas_criadas: int
+    atualizadas: int
+    mensagem: str
+
 

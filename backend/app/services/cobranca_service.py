@@ -54,22 +54,46 @@ async def pagar_cobranca(db: AsyncSession, cobranca_id: str, usuario=None) -> Co
     cob.status = "pago"
     cob.data_pagamento = date.today()
 
-    # Cria automaticamente a receita correspondente
+    # Atualiza ou cria a receita correspondente
+    rec = None
+    if cob.receita_id:
+        res_r = await db.execute(select(Receita).where(Receita.id == cob.receita_id))
+        rec = res_r.scalar_one_or_none()
+
+    tipo_rec = TipoReceita.fundo_reserva if "Fundo de Reserva" in cob.descricao else TipoReceita.condominio
+    cat_rec = "fundo_reserva" if tipo_rec == TipoReceita.fundo_reserva else "taxa_condominial"
     valor_efetivo = cob.valor_total if (cob.valor_total and cob.valor_total > 0) else cob.valor
-    rec = Receita(
-        descricao=f"Pagamento {cob.descricao}",
-        tipo=TipoReceita.condominio,
-        categoria="taxa_condominial",
-        competencia=cob.competencia,
-        vencimento=cob.vencimento,
-        valor=valor_efetivo,
-        status=StatusFinanceiro.pago,
-        data_recebimento=date.today(),
-        apartamento_id=cob.apartamento_id,
-    )
-    db.add(rec)
-    await db.flush()
-    cob.receita_id = rec.id
+
+    if not rec:
+        res_r = await db.execute(
+            select(Receita).where(
+                Receita.apartamento_id == cob.apartamento_id,
+                Receita.competencia == cob.competencia,
+                Receita.tipo == tipo_rec,
+            )
+        )
+        rec = res_r.scalars().first()
+
+    if rec:
+        rec.status = StatusFinanceiro.pago
+        rec.data_recebimento = date.today()
+        rec.valor = valor_efetivo
+        cob.receita_id = rec.id
+    else:
+        rec = Receita(
+            descricao=f"Pagamento {cob.descricao}",
+            tipo=tipo_rec,
+            categoria=cat_rec,
+            competencia=cob.competencia,
+            vencimento=cob.vencimento,
+            valor=valor_efetivo,
+            status=StatusFinanceiro.pago,
+            data_recebimento=date.today(),
+            apartamento_id=cob.apartamento_id,
+        )
+        db.add(rec)
+        await db.flush()
+        cob.receita_id = rec.id
 
     await registrar_auditoria(
         db,
@@ -568,6 +592,46 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
         )
     except Exception:
         pass
+
+    # Sincroniza / cria as Receitas correspondentes para a competência
+    if geradas:
+        res_rec = await db.execute(
+            select(Receita).where(Receita.competencia == competencia)
+        )
+        receitas_existentes = res_rec.scalars().all()
+        rec_map = {(r.apartamento_id, r.tipo): r for r in receitas_existentes}
+
+        for cob in geradas:
+            tipo_rec = TipoReceita.fundo_reserva if "Fundo de Reserva" in cob.descricao else TipoReceita.condominio
+            cat_rec = "fundo_reserva" if tipo_rec == TipoReceita.fundo_reserva else "taxa_condominial"
+            val_rec = cob.valor_total if (cob.valor_total and cob.valor_total > 0) else cob.valor
+
+            rec_existente = rec_map.get((cob.apartamento_id, tipo_rec))
+
+            if rec_existente:
+                if rec_existente.status == StatusFinanceiro.pendente:
+                    rec_existente.valor = val_rec
+                    rec_existente.descricao = cob.descricao
+                    rec_existente.vencimento = cob.vencimento
+                    rec_existente.tipo = tipo_rec
+                    rec_existente.categoria = cat_rec
+                cob.receita_id = rec_existente.id
+            else:
+                nova_rec = Receita(
+                    descricao=cob.descricao,
+                    tipo=tipo_rec,
+                    categoria=cat_rec,
+                    valor=val_rec,
+                    competencia=cob.competencia,
+                    vencimento=cob.vencimento,
+                    status=cob.status,
+                    data_recebimento=cob.data_pagamento if cob.status == StatusFinanceiro.pago else None,
+                    apartamento_id=cob.apartamento_id,
+                )
+                db.add(nova_rec)
+                await db.flush()
+                cob.receita_id = nova_rec.id
+                rec_map[(cob.apartamento_id, tipo_rec)] = nova_rec
 
     await db.commit()
 

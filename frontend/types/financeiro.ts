@@ -7,7 +7,10 @@ export interface Receita {
   valor: number; competencia: string; vencimento: string | null;
   data_recebimento: string | null; status: StatusFinanceiro; observacao: string | null;
   comprovante_url?: string | null; comprovante_nome?: string | null;
-  apartamento_id: string | null; created_at: string; updated_at: string;
+  apartamento_id: string | null;
+  apartamento_numero?: string | null;
+  apartamento_bloco?: string | null;
+  created_at: string; updated_at: string;
 }
 
 export interface DespesaParcela {
@@ -72,4 +75,22 @@ export interface VerificarDuplicacaoResponse {
   mes_destino: number;
   ano_destino: number;
 }
+
+export interface SincronizarReceitasRequest {
+  competencia?: string;
+  mes?: number;
+  ano?: number;
+  vencimento?: string;
+}
+
+export interface SincronizarReceitasResponse {
+  competencia: string;
+  competencia_formatada: string;
+  total_receitas: number;
+  total_valor: number;
+  novas_criadas: number;
+  atualizadas: number;
+  mensagem: string;
+}
+
 

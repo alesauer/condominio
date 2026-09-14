@@ -13,6 +13,8 @@ from app.schemas.receita import (
     DuplicarMesRequest,
     DuplicarMesResponse,
     VerificarDuplicacaoResponse,
+    SincronizarReceitasRequest,
+    SincronizarReceitasResponse,
 )
 from app.schemas.common import PaginatedResponse
 from app.services import receita_service
@@ -37,6 +39,22 @@ async def list_receitas(
         db, page=page, page_size=page_size, competencia=competencia, mes=mes, ano=ano, tipo=tipo, status=status
     )
     return await paginate(db, query, page=page, page_size=page_size)
+
+
+@router.post("/sincronizar-mes", response_model=SincronizarReceitasResponse, dependencies=[Depends(admin_required)])
+async def sincronizar_receitas_mes(
+    data: SincronizarReceitasRequest,
+    db: AsyncSession = Depends(get_db),
+    usuario=Depends(get_current_user),
+):
+    return await receita_service.sincronizar_receitas_mes(
+        db,
+        competencia=data.competencia,
+        mes=data.mes,
+        ano=data.ano,
+        vencimento=data.vencimento,
+        usuario=usuario,
+    )
 
 
 @router.post("/verificar-duplicacao", response_model=VerificarDuplicacaoResponse, dependencies=[Depends(admin_required)])

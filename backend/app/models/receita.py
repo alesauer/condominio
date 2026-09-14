@@ -36,3 +36,11 @@ class Receita(Base, BaseModelMixin):
     apartamento_id = Column(UUID(as_uuid=True), ForeignKey("apartamentos.id", ondelete="SET NULL"), nullable=True)
 
     apartamento = relationship("Apartamento")
+
+    @property
+    def apartamento_numero(self) -> str | None:
+        return self.apartamento.numero if self.apartamento else None
+
+    @property
+    def apartamento_bloco(self) -> str | None:
+        return self.apartamento.bloco if self.apartamento else None

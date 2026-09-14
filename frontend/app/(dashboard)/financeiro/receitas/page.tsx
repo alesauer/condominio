@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { useReceitas, useUpdateReceita, useDeleteReceita } from "@/services/receitas.service";
+import { useReceitas, useUpdateReceita, useDeleteReceita, useSincronizarReceitasMes } from "@/services/receitas.service";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import { useSortableData } from "@/hooks/use-sortable-data";
 import { ConfirmarPagamentoModal } from "@/components/financeiro/confirmar-pagamento-modal";
 import { DuplicarMesModal } from "@/components/financeiro/duplicar-mes-modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Calendar, DollarSign, CheckCircle2, Clock, Paperclip, Download, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Calendar, DollarSign, CheckCircle2, Clock, Paperclip, Download, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { Receita } from "@/types/financeiro";
 
@@ -108,6 +108,29 @@ export default function ReceitasPage() {
   const { data, isLoading, refetch } = useReceitas(queryParams);
   const updateMut = useUpdateReceita();
   const deleteMut = useDeleteReceita();
+  const sincronizarMut = useSincronizarReceitasMes();
+
+  const handleSincronizar = async () => {
+    if (selectedMes === "all") {
+      toast.error("Por favor, selecione um mês específico para sincronizar as receitas.");
+      return;
+    }
+    const mesNum = parseInt(selectedMes, 10);
+    const anoNum = parseInt(selectedAno, 10);
+    const competenciaStr = `${anoNum}-${String(mesNum).padStart(2, "0")}-01`;
+
+    try {
+      const res = await sincronizarMut.mutateAsync({
+        competencia: competenciaStr,
+        mes: mesNum,
+        ano: anoNum,
+      });
+      await refetch();
+      toast.success(res.mensagem || "Receitas sincronizadas com sucesso!");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Erro ao sincronizar receitas com as despesas do mês.");
+    }
+  };
 
   const { items: sortedReceitas, sortField, sortDirection, requestSort } = useSortableData(
     data?.items || [],
@@ -148,82 +171,80 @@ export default function ReceitasPage() {
   };
 
   const currentMonthLabel = useMemo(() => {
-    if (selectedMes === "all") return `Ano de ${selectedAno}`;
-    const mObj = MESES.find((m) => m.value === selectedMes);
-    return `${mObj?.label || ""} de ${selectedAno}`;
+    if (selectedMes === "all") return `Todos os meses de ${selectedAno}`;
+    const m = MESES.find((item) => item.value === selectedMes);
+    return `${m?.label || selectedMes}/${selectedAno}`;
   }, [selectedMes, selectedAno]);
 
   // KPIs
   const kpis = useMemo(() => {
-    const items = data?.items || [];
-    const total = items.reduce((acc, r) => acc + Number(r.valor || 0), 0);
-    const pago = items.filter((r) => r.status === "pago").reduce((acc, r) => acc + Number(r.valor || 0), 0);
-    const pendente = items.filter((r) => r.status === "pendente" || r.status === "atrasado").reduce((acc, r) => acc + Number(r.valor || 0), 0);
-    return { total, pago, pendente, count: items.length };
-  }, [data?.items]);
+    if (!data?.items) return { total: 0, pago: 0, pendente: 0, count: 0 };
+    let total = 0;
+    let pago = 0;
+    let pendente = 0;
+    data.items.forEach((r) => {
+      const v = Number(r.valor) || 0;
+      total += v;
+      if (r.status === "pago") pago += v;
+      if (r.status === "pendente" || r.status === "atrasado") pendente += v;
+    });
+    return { total, pago, pendente, count: data.items.length };
+  }, [data]);
 
-  const openEditModal = (r: Receita) => {
-    setEditingReceita(r);
+  const openEditModal = (receita: Receita) => {
+    setEditingReceita(receita);
     setEditForm({
-      descricao: r.descricao,
-      tipo: r.tipo,
-      valor: String(r.valor),
-      competencia: r.competencia ? r.competencia.slice(0, 10) : "",
-      vencimento: r.vencimento ? r.vencimento.slice(0, 10) : "",
-      data_recebimento: r.data_recebimento ? r.data_recebimento.slice(0, 10) : "",
-      status: r.status,
-      categoria: r.categoria || "",
-      observacao: r.observacao || "",
+      descricao: receita.descricao,
+      tipo: receita.tipo,
+      valor: String(receita.valor),
+      competencia: receita.competencia?.split("T")[0] || "",
+      vencimento: receita.vencimento ? receita.vencimento.split("T")[0] : "",
+      data_recebimento: receita.data_recebimento ? receita.data_recebimento.split("T")[0] : "",
+      status: receita.status,
+      categoria: receita.categoria || "",
+      observacao: receita.observacao || "",
     });
   };
 
-  const handleToggleStatus = async (r: Receita) => {
-    if (r.status !== "pago") {
-      // Abre modal para anexar comprovante e confirmar recebimento/pagamento
-      setPagamentoModalItem(r);
+  const handleToggleStatus = (receita: Receita) => {
+    if (receita.status === "pendente" || receita.status === "atrasado") {
+      setPagamentoModalItem(receita);
       setPagamentoModalOpen(true);
-      return;
-    }
-
-    if (!confirm(`Deseja alterar a receita "${r.descricao}" de PAGO para PENDENTE?`)) {
-      return;
-    }
-
-    try {
-      await updateMut.mutateAsync({
-        id: r.id,
-        data: {
-          status: "pendente",
-          data_recebimento: null,
-        },
-      });
-      await refetch();
-      toast.success(`Receita "${r.descricao}" marcada como PENDENTE!`);
-    } catch {
-      toast.error("Erro ao alterar status da receita");
+    } else {
+      updateMut.mutate(
+        { id: receita.id, data: { status: "pendente", data_recebimento: null } },
+        {
+          onSuccess: () => {
+            toast.success("Status alterado para Pendente");
+            refetch();
+          },
+          onError: () => toast.error("Erro ao alterar status"),
+        }
+      );
     }
   };
 
-  const handleDownloadComprovante = async (r: Receita) => {
+  const handleDownloadComprovante = async (receita: Receita) => {
     try {
-      const res = await api.get(`/receitas/${r.id}/comprovante/download`, {
+      const res = await api.get(`/receitas/${receita.id}/comprovante/download`, {
         responseType: "blob",
       });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const blob = new Blob([res.data]);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", r.comprovante_nome || `comprovante_${r.id}.pdf`);
+      link.setAttribute("download", receita.comprovante_nome || `comprovante_${receita.id}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      toast.error("Erro ao baixar comprovante.");
+      toast.error("Erro ao baixar comprovante");
     }
   };
 
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveEdit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!editingReceita) return;
     try {
       await updateMut.mutateAsync({
@@ -231,8 +252,8 @@ export default function ReceitasPage() {
         data: {
           descricao: editForm.descricao,
           tipo: editForm.tipo as any,
-          valor: Number(editForm.valor),
-          competencia: editForm.competencia,
+          valor: parseFloat(editForm.valor) || 0,
+          competencia: editForm.competencia || undefined,
           vencimento: editForm.vencimento || null,
           data_recebimento: editForm.data_recebimento || null,
           status: editForm.status as any,
@@ -265,9 +286,23 @@ export default function ReceitasPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Receitas</h1>
-          <p className="text-muted-foreground">Gerencie e visualize as receitas mensais do condomínio</p>
+          <p className="text-muted-foreground">Gerencie e visualize as receitas e previsão de arrecadação do condomínio</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSincronizar}
+            disabled={sincronizarMut.isPending || selectedMes === "all"}
+            className="shadow-sm border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+            title={
+              selectedMes === "all"
+                ? "Selecione um mês específico para sincronizar as receitas"
+                : `Sincronizar receitas com base nas despesas e medições de ${currentMonthLabel}`
+            }
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${sincronizarMut.isPending ? "animate-spin text-emerald-600" : "text-emerald-600"}`} />
+            {sincronizarMut.isPending ? "Sincronizando..." : "Sincronizar com Despesas"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => setDuplicarModalOpen(true)}
@@ -459,6 +494,11 @@ export default function ReceitasPage() {
                   <tr key={r.id} className="hover:bg-muted/30 transition-colors">
                     <td className="p-3 font-medium">
                       <div className="flex items-center gap-2">
+                        {r.apartamento_numero && (
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/25 font-semibold text-xs px-2 py-0.5 shrink-0">
+                            Apto {r.apartamento_numero}
+                          </Badge>
+                        )}
                         <span>{r.descricao}</span>
                         {r.comprovante_url && (
                           <button
@@ -533,8 +573,22 @@ export default function ReceitasPage() {
                 {(!data?.items || data.items.length === 0) && (
                   <tr>
                     <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                      <p className="font-medium">Nenhuma receita encontrada para o período selecionado.</p>
-                      <p className="text-xs mt-1">Altere os filtros acima ou cadastre uma nova receita.</p>
+                      <p className="font-medium text-foreground">Nenhuma receita encontrada para {currentMonthLabel}.</p>
+                      <p className="text-xs mt-1">A receita do condomínio provém do rateio das despesas + gás + fundo de reserva.</p>
+                      {selectedMes !== "all" && (
+                        <div className="mt-4 flex items-center justify-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSincronizar}
+                            disabled={sincronizarMut.isPending}
+                            className="border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 shadow-sm"
+                          >
+                            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${sincronizarMut.isPending ? "animate-spin" : ""}`} />
+                            {sincronizarMut.isPending ? "Sincronizando..." : "Gerar Previsão a partir das Despesas"}
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}

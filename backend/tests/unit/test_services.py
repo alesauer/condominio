@@ -442,6 +442,29 @@ class TestReceitaService:
         mock_db.delete.assert_called_once()
         mock_db.commit.assert_awaited()
 
+    async def test_sincronizar_receitas_mes(self, mock_db):
+        from app.models.cobranca import Cobranca
+        apto_id = uuid.uuid4()
+        c1 = Cobranca(
+            id=uuid.uuid4(),
+            apartamento_id=apto_id,
+            descricao="Taxa Condominial Apto 101 - Ref. 09/2026",
+            competencia=date(2026, 9, 1),
+            vencimento=date(2026, 9, 10),
+            valor=Decimal("450.00"),
+            valor_total=Decimal("450.00"),
+            status="pendente",
+        )
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[c1]),  # select cobs
+            make_mock_result(scalars_all_return=[]),    # select receitas existentes
+        ]
+        res = await receita_service.sincronizar_receitas_mes(mock_db, competencia="2026-09")
+        assert res["total_receitas"] == 1
+        assert res["novas_criadas"] == 1
+        assert res["total_valor"] == 450.0
+        mock_db.commit.assert_awaited()
+
 
 
 # ── CobrancaService ────────────────────────────────────────────────
@@ -493,7 +516,8 @@ class TestCobrancaService:
             make_mock_result(scalar_one_or_none_return=rateio_agua), # rateio agua
             make_mock_result(scalars_all_return=[det_agua1, det_agua2]), # rateio agua detalhes
             make_mock_result(scalars_all_return=[gas1, gas2]), # leituras gas
-            make_mock_result(scalars_all_return=[]), # existentes
+            make_mock_result(scalars_all_return=[]), # existentes cobrancas
+            make_mock_result(scalars_all_return=[]), # existentes receitas
             make_mock_result(scalars_all_return=[]), # recarregadas
         ]
 
@@ -541,7 +565,8 @@ class TestCobrancaService:
             make_mock_result(scalars_all_return=[]), # despesas parcelas
             make_mock_result(scalar_one_or_none_return=None), # rateio agua
             make_mock_result(scalars_all_return=[]), # leituras gas
-            make_mock_result(scalars_all_return=[]), # existentes
+            make_mock_result(scalars_all_return=[]), # existentes cobrancas
+            make_mock_result(scalars_all_return=[]), # existentes receitas
             make_mock_result(scalars_all_return=[]), # recarregadas
         ]
 
@@ -600,6 +625,7 @@ class TestCobrancaService:
             make_mock_result(scalars_all_return=[cob_paga, cob_pendente]), # cobrancas existentes
             # após apagar pendente:
             make_mock_result(scalars_all_return=[cob_paga.apartamento_id]), # cobrancas existentes restantes
+            make_mock_result(scalars_all_return=[]), # existentes receitas
             make_mock_result(scalars_all_return=[]), # recarregadas
         ]
 

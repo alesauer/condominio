@@ -78,3 +78,24 @@ export function useDuplicarReceitasMes() {
   });
 }
 
+export function useSincronizarReceitasMes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { competencia?: string; mes?: number; ano?: number; vencimento?: string }) =>
+      api.post<{
+        competencia: string;
+        competencia_formatada: string;
+        total_receitas: number;
+        total_valor: number;
+        novas_criadas: number;
+        atualizadas: number;
+        mensagem: string;
+      }>("/receitas/sincronizar-mes", data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY], exact: false, refetchType: "all" });
+      qc.invalidateQueries({ queryKey: ["cobrancas"], exact: false, refetchType: "all" });
+    },
+  });
+}
+
+

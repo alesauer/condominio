@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any, Optional
 from dateutil.relativedelta import relativedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, extract
@@ -54,11 +55,13 @@ async def get_receita(db: AsyncSession, receita_id: str) -> Receita:
     return rec
 
 
-from sqlalchemy import select, extract
+from decimal import Decimal
+from sqlalchemy.orm import selectinload
+from app.models.cobranca import Cobranca
 
 
 async def list_receitas(db, page=1, page_size=20, competencia=None, mes=None, ano=None, tipo=None, status=None):
-    query = select(Receita)
+    query = select(Receita).options(selectinload(Receita.apartamento))
     if competencia:
         query = query.where(Receita.competencia == competencia)
     if ano:
@@ -69,7 +72,7 @@ async def list_receitas(db, page=1, page_size=20, competencia=None, mes=None, an
         query = query.where(Receita.tipo == tipo)
     if status:
         query = query.where(Receita.status == status)
-    return query.order_by(Receita.competencia.desc())
+    return query.order_by(Receita.competencia.desc(), Receita.created_at.asc())
 
 
 
@@ -78,6 +81,23 @@ async def update_receita(db: AsyncSession, receita_id: str, data: dict, usuario=
     dados_anteriores = {"descricao": rec.descricao, "valor": float(rec.valor), "status": str(rec.status)}
     for key, value in data.items():
         setattr(rec, key, value)
+
+    # Sincroniza a cobrança vinculada se houver alteração de status
+    if "status" in data:
+        res_cobs = await db.execute(
+            select(Cobranca).where(
+                (Cobranca.receita_id == rec.id) |
+                ((Cobranca.apartamento_id == rec.apartamento_id) & (Cobranca.competencia == rec.competencia))
+            )
+        )
+        for cob in res_cobs.scalars().all():
+            cob.status = rec.status
+            if rec.status == "pago":
+                cob.data_pagamento = rec.data_recebimento or date.today()
+            elif rec.status == "pendente":
+                cob.data_pagamento = None
+            cob.receita_id = rec.id
+
     await registrar_auditoria(
         db,
         acao="ATUALIZAR",
@@ -128,6 +148,18 @@ async def upload_comprovante_receita(db: AsyncSession, receita_id: str, file, da
         tipo_mime=file.content_type,
     )
     db.add(doc)
+
+    # Sincroniza a cobrança correspondente
+    res_cobs = await db.execute(
+        select(Cobranca).where(
+            (Cobranca.receita_id == rec.id) |
+            ((Cobranca.apartamento_id == rec.apartamento_id) & (Cobranca.competencia == rec.competencia))
+        )
+    )
+    for cob in res_cobs.scalars().all():
+        cob.status = "pago"
+        cob.data_pagamento = rec.data_recebimento
+        cob.receita_id = rec.id
 
     await registrar_auditoria(
         db,
@@ -267,5 +299,134 @@ async def duplicar_receitas_mes(
         "mensagem": f"{duplicados} receita(s) duplicada(s) com sucesso para {mes_destino:02d}/{ano_destino}."
         + (f" ({apagados} anteriores foram apagadas)" if apagados > 0 else ""),
     }
+
+
+async def sincronizar_receitas_mes(
+    db: AsyncSession,
+    competencia: Any = None,
+    mes: int = None,
+    ano: int = None,
+    vencimento: date = None,
+    usuario=None,
+) -> dict:
+    from app.services import cobranca_service
+    from app.models.cobranca import Cobranca
+    from app.models.receita import TipoReceita, StatusFinanceiro
+
+    # Determina a data de competência
+    if competencia:
+        comp = cobranca_service._parse_competencia(competencia)
+    elif mes and ano:
+        comp = date(ano, mes, 1)
+    else:
+        hoje = date.today()
+        comp = date(hoje.year, hoje.month, 1)
+
+    comp_formatada = f"{cobranca_service.MESES_PT[comp.month - 1]}/{comp.year}"
+
+    # Busca cobranças existentes para a competência
+    res_cobs = await db.execute(
+        select(Cobranca)
+        .options(selectinload(Cobranca.apartamento))
+        .where(Cobranca.competencia == comp)
+    )
+    cobs = res_cobs.scalars().all()
+
+    # Se não houver cobranças geradas, gera as cobranças do mês primeiro
+    if not cobs:
+        dados_geracao = {
+            "competencia": str(comp),
+            "vencimento": vencimento or date(comp.year, comp.month, 10),
+            "sobrescrever": False,
+        }
+        await cobranca_service.gerar_cobrancas_mensais(db, dados_geracao, usuario=usuario)
+        # Recarrega as cobranças recém geradas
+        res_cobs = await db.execute(
+            select(Cobranca)
+            .options(selectinload(Cobranca.apartamento))
+            .where(Cobranca.competencia == comp)
+        )
+        cobs = res_cobs.scalars().all()
+
+    novas_criadas = 0
+    atualizadas = 0
+    total_valor = Decimal("0.00")
+    total_receitas = 0
+
+    for cob in cobs:
+        val_cob = cob.valor_total if (cob.valor_total and cob.valor_total > 0) else cob.valor
+        total_valor += Decimal(str(val_cob))
+        total_receitas += 1
+
+        tipo_rec = TipoReceita.fundo_reserva if "Fundo de Reserva" in cob.descricao else TipoReceita.condominio
+        cat_rec = "fundo_reserva" if tipo_rec == TipoReceita.fundo_reserva else "taxa_condominial"
+
+        rec_alvo = None
+        if cob.receita_id:
+            res_r = await db.execute(select(Receita).where(Receita.id == cob.receita_id))
+            rec_alvo = res_r.scalar_one_or_none()
+
+        if not rec_alvo:
+            # Busca receita existente compatível
+            q_rec = select(Receita).where(
+                Receita.apartamento_id == cob.apartamento_id,
+                Receita.competencia == comp,
+                Receita.tipo == tipo_rec,
+            )
+            res_r = await db.execute(q_rec)
+            rec_alvo = res_r.scalars().first()
+
+        if rec_alvo:
+            if rec_alvo.status == StatusFinanceiro.pendente:
+                rec_alvo.valor = val_cob
+                rec_alvo.descricao = cob.descricao
+                rec_alvo.vencimento = cob.vencimento
+                rec_alvo.tipo = tipo_rec
+                rec_alvo.categoria = cat_rec
+                atualizadas += 1
+            cob.receita_id = rec_alvo.id
+        else:
+            nova_rec = Receita(
+                descricao=cob.descricao,
+                tipo=tipo_rec,
+                categoria=cat_rec,
+                valor=val_cob,
+                competencia=comp,
+                vencimento=cob.vencimento,
+                status=cob.status,
+                data_recebimento=cob.data_pagamento if cob.status == StatusFinanceiro.pago else None,
+                apartamento_id=cob.apartamento_id,
+            )
+            db.add(nova_rec)
+            await db.flush()
+            cob.receita_id = nova_rec.id
+            novas_criadas += 1
+
+    await registrar_auditoria(
+        db,
+        acao="SINCRONIZAR_RECEITAS",
+        entidade_tipo="receitas",
+        entidade_id=None,
+        dados_novos={
+            "competencia": str(comp),
+            "total_receitas": total_receitas,
+            "novas_criadas": novas_criadas,
+            "atualizadas": atualizadas,
+            "total_valor": float(total_valor),
+        },
+        usuario=usuario,
+    )
+    await db.commit()
+
+    return {
+        "competencia": str(comp),
+        "competencia_formatada": comp_formatada,
+        "total_receitas": total_receitas,
+        "total_valor": float(total_valor),
+        "novas_criadas": novas_criadas,
+        "atualizadas": atualizadas,
+        "mensagem": f"Receitas de {comp_formatada} sincronizadas com sucesso ({novas_criadas} criadas, {atualizadas} atualizadas, total: R$ {total_valor:.2f}).",
+    }
+
 
 
