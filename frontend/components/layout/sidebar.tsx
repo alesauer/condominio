@@ -11,7 +11,6 @@ import {
   TrendingUp,
   TrendingDown,
   CreditCard,
-  Droplets,
   Flame,
   Bell,
   Calendar,
@@ -48,7 +47,6 @@ const menuGroups = [
   {
     title: "Consumo",
     items: [
-      { href: "/agua", label: "Água", icon: Droplets },
       { href: "/gas", label: "Gás", icon: Flame },
     ],
   },
