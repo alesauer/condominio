@@ -569,16 +569,16 @@ export default function GasPage() {
                       <td className="py-2.5 px-4 text-right whitespace-nowrap">
                         {isFilled ? (
                           <span
-                            className={`font-bold text-sm ${
+                            className={`font-mono text-sm ${
                               hasConsumo
-                                ? "text-primary dark:text-primary-foreground font-extrabold"
-                                : "text-muted-foreground"
+                                ? "font-extrabold text-emerald-600 dark:text-emerald-400"
+                                : "font-medium text-muted-foreground"
                             }`}
                           >
                             {formatCurrency(row.valorCobradoCalculado)}
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground/50">R$ 0,00</span>
+                          <span className="text-xs text-muted-foreground/50 font-mono">R$ 0,00</span>
                         )}
                       </td>
 
