@@ -578,8 +578,53 @@ async def seed_monazita():
                     )
                     db.add(rec_extra)
 
+        # 5. Leituras de Gás (LeituraGas) - Setembro/2026
+        from app.models.leitura_gas import LeituraGas
+
+        dados_gas_setembro = [
+            {"numero": "101", "anterior": 626.0, "atual": 628.0, "consumo": 2.0, "unitario": 19.95, "valor": 39.90},
+            {"numero": "201", "anterior": 239.0, "atual": 240.0, "consumo": 1.0, "unitario": 19.95, "valor": 19.95},
+            {"numero": "202", "anterior": 10.0,  "atual": 10.0,  "consumo": 0.0, "unitario": 19.95, "valor": 0.00},
+            {"numero": "301", "anterior": 362.0, "atual": 363.0, "consumo": 1.0, "unitario": 19.95, "valor": 19.95},
+            {"numero": "302", "anterior": 503.0, "atual": 503.0, "consumo": 0.0, "unitario": 19.95, "valor": 0.00},
+            {"numero": "401", "anterior": 322.0, "atual": 322.0, "consumo": 0.0, "unitario": 19.95, "valor": 0.00},
+            {"numero": "402", "anterior": 36.0,  "atual": 36.0,  "consumo": 0.0, "unitario": 19.95, "valor": 0.00},
+        ]
+
+        print("Gerando leituras de gás de Setembro/2026...")
+        dt_comp_set = date(2026, 9, 1)
+        for item in dados_gas_setembro:
+            apto_id = aptos_map.get(item["numero"])
+            if not apto_id:
+                continue
+
+            existing_gas = await db.scalar(
+                select(LeituraGas).where(
+                    LeituraGas.apartamento_id == apto_id,
+                    LeituraGas.competencia == dt_comp_set
+                )
+            )
+            if not existing_gas:
+                lg = LeituraGas(
+                    apartamento_id=apto_id,
+                    competencia=dt_comp_set,
+                    leitura_anterior=item["anterior"],
+                    leitura_atual=item["atual"],
+                    consumo=item["consumo"],
+                    valor_unitario=item["unitario"],
+                    valor_cobrado=item["valor"],
+                    observacao="Leitura de gás 09/2026",
+                )
+                db.add(lg)
+            else:
+                existing_gas.leitura_anterior = item["anterior"]
+                existing_gas.leitura_atual = item["atual"]
+                existing_gas.consumo = item["consumo"]
+                existing_gas.valor_unitario = item["unitario"]
+                existing_gas.valor_cobrado = item["valor"]
+
         await db.commit()
-        print("✅ Todos os dados reais e financeiros de teste foram importados com sucesso!")
+        print("✅ Todos os dados reais, financeiros e leituras de gás foram importados com sucesso!")
 
 
 if __name__ == "__main__":
