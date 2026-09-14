@@ -223,11 +223,14 @@ async def salvar_leituras_lote(db: AsyncSession, data: dict, usuario=None) -> Di
         item_unitario = item.get("valor_unitario")
         obs = item.get("observacao")
 
-        unit = Decimal(str(item_unitario if item_unitario is not None else valor_unitario_padrao))
+        unit_str = str(item_unitario if item_unitario is not None else valor_unitario_padrao).replace(",", ".")
+        unit = Decimal(unit_str)
 
         if leitura_atual is not None and str(leitura_atual).strip() != "":
-            atual_dec = Decimal(str(leitura_atual))
-            ant_dec = Decimal(str(leitura_anterior)) if leitura_anterior is not None and str(leitura_anterior).strip() != "" else Decimal("0")
+            atual_str = str(leitura_atual).replace(",", ".").strip()
+            atual_dec = Decimal(atual_str)
+            ant_str = str(leitura_anterior).replace(",", ".").strip() if leitura_anterior is not None and str(leitura_anterior).strip() != "" else "0"
+            ant_dec = Decimal(ant_str)
             consumo_dec = max(Decimal("0"), atual_dec - ant_dec)
             valor_cobrado_dec = (consumo_dec * unit).quantize(Decimal("0.01"))
 

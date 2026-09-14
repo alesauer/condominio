@@ -33,6 +33,15 @@ const MESES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+function parseNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return isNaN(value) ? 0 : value;
+  const str = String(value).trim().replace(",", ".");
+  if (str === "") return 0;
+  const num = parseFloat(str);
+  return isNaN(num) ? 0 : num;
+}
+
 interface RowState {
   apartamento_id: string;
   apartamento_numero: string;
@@ -53,6 +62,7 @@ export default function GasPage() {
   const competenciaParam = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
 
   const handlePrevMonth = () => {
+    setHasUnsavedChanges(false);
     if (selectedMonth === 1) {
       setSelectedMonth(12);
       setSelectedYear((y) => y - 1);
@@ -62,6 +72,7 @@ export default function GasPage() {
   };
 
   const handleNextMonth = () => {
+    setHasUnsavedChanges(false);
     if (selectedMonth === 12) {
       setSelectedMonth(1);
       setSelectedYear((y) => y + 1);
@@ -80,7 +91,7 @@ export default function GasPage() {
 
   // Sincroniza estado local quando os dados da planilha chegam da API
   useEffect(() => {
-    if (planilhaData) {
+    if (planilhaData && !hasUnsavedChanges) {
       const defaultUnit = planilhaData.valor_unitario_padrao || 19.95;
       setValorUnitarioPadrao(String(defaultUnit));
 
@@ -97,9 +108,8 @@ export default function GasPage() {
       }));
 
       setRows(newRows);
-      setHasUnsavedChanges(false);
     }
-  }, [planilhaData]);
+  }, [planilhaData, hasUnsavedChanges]);
 
   // Atualiza campo específico de uma linha
   const handleCellChange = (
@@ -136,7 +146,7 @@ export default function GasPage() {
   const handlePreencherSemConsumo = () => {
     setRows((prev) =>
       prev.map((r) => {
-        if (!r.leitura_atual && r.leitura_anterior) {
+        if (!r.leitura_atual.trim() && r.leitura_anterior) {
           return {
             ...r,
             leitura_atual: r.leitura_anterior,
@@ -156,18 +166,21 @@ export default function GasPage() {
     let totalValor = 0;
     let preenchidosCount = 0;
 
+    const unitPadrao = parseNumber(valorUnitarioPadrao) || 19.95;
+
     const items = rows.map((r) => {
-      const ant = Number(r.leitura_anterior) || 0;
-      const hasAtual = r.leitura_atual.trim() !== "";
-      const atual = hasAtual ? Number(r.leitura_atual) || 0 : null;
-      const unit = Number(r.valor_unitario) || Number(valorUnitarioPadrao) || 19.95;
+      const ant = parseNumber(r.leitura_anterior);
+      const rawAtual = String(r.leitura_atual ?? "").trim();
+      const hasAtual = rawAtual !== "";
+      const atual = parseNumber(rawAtual);
+      const unit = parseNumber(r.valor_unitario) || unitPadrao;
 
       let consumo = 0;
       let valorCobrado = 0;
 
-      if (atual !== null) {
+      if (hasAtual) {
         consumo = Math.max(0, atual - ant);
-        valorCobrado = consumo * unit;
+        valorCobrado = Math.round(consumo * unit * 100) / 100;
         preenchidosCount++;
       }
 
@@ -184,8 +197,8 @@ export default function GasPage() {
 
     return {
       items,
-      totalConsumo,
-      totalValor,
+      totalConsumo: Math.round(totalConsumo * 100) / 100,
+      totalValor: Math.round(totalValor * 100) / 100,
       preenchidosCount,
       totalAptos: rows.length,
     };
@@ -196,16 +209,21 @@ export default function GasPage() {
     try {
       const payload = {
         competencia: competenciaParam,
-        valor_unitario_padrao: Number(valorUnitarioPadrao) || 19.95,
+        valor_unitario_padrao: parseNumber(valorUnitarioPadrao) || 19.95,
         leituras: rows
-          .filter((r) => r.leitura_atual.trim() !== "")
-          .map((r) => ({
-            apartamento_id: r.apartamento_id,
-            leitura_anterior: r.leitura_anterior.trim() !== "" ? Number(r.leitura_anterior) : 0,
-            leitura_atual: Number(r.leitura_atual),
-            valor_unitario: Number(r.valor_unitario) || Number(valorUnitarioPadrao) || 19.95,
-            observacao: r.observacao.trim() || undefined,
-          })),
+          .filter((r) => String(r.leitura_atual ?? "").trim() !== "")
+          .map((r) => {
+            const ant = parseNumber(r.leitura_anterior);
+            const atual = parseNumber(r.leitura_atual);
+            const unit = parseNumber(r.valor_unitario) || parseNumber(valorUnitarioPadrao) || 19.95;
+            return {
+              apartamento_id: r.apartamento_id,
+              leitura_anterior: ant,
+              leitura_atual: atual,
+              valor_unitario: unit,
+              observacao: r.observacao?.trim() || undefined,
+            };
+          }),
       };
 
       await salvarMut.mutateAsync(payload);
@@ -339,11 +357,16 @@ export default function GasPage() {
           <div className="flex items-center gap-2 pt-1">
             <span className="text-sm font-semibold text-muted-foreground">R$</span>
             <Input
-              type="number"
-              step="0.0001"
+              type="text"
+              inputMode="decimal"
               className="h-9 text-base font-bold bg-background text-foreground"
               value={valorUnitarioPadrao}
-              onChange={(e) => handleValorUnitarioPadraoChange(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (/^[0-9.,]*$/.test(val)) {
+                  handleValorUnitarioPadraoChange(val);
+                }
+              }}
               placeholder="19.95"
             />
           </div>
@@ -475,11 +498,16 @@ export default function GasPage() {
                       <td className="py-2.5 px-3 text-right">
                         <Input
                           ref={(el) => { inputRefs.current[`anterior-${idx}`] = el; }}
-                          type="number"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           className="h-8 text-right text-xs font-mono font-medium bg-background/80 border-muted-foreground/30 focus-visible:ring-1"
                           value={row.leitura_anterior}
-                          onChange={(e) => handleCellChange(idx, "leitura_anterior", e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^[0-9.,]*$/.test(val)) {
+                              handleCellChange(idx, "leitura_anterior", val);
+                            }
+                          }}
                           onKeyDown={(e) => handleKeyDownInput(e, idx, "anterior")}
                           placeholder="0"
                         />
@@ -489,15 +517,20 @@ export default function GasPage() {
                       <td className="py-2.5 px-3 text-right">
                         <Input
                           ref={(el) => { inputRefs.current[`atual-${idx}`] = el; }}
-                          type="number"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           className={`h-8 text-right text-xs font-mono font-bold bg-background focus-visible:ring-2 focus-visible:ring-primary ${
                             isFilled
                               ? "border-primary/50 text-foreground"
                               : "border-dashed border-muted-foreground/40 text-muted-foreground"
                           }`}
                           value={row.leitura_atual}
-                          onChange={(e) => handleCellChange(idx, "leitura_atual", e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^[0-9.,]*$/.test(val)) {
+                              handleCellChange(idx, "leitura_atual", val);
+                            }
+                          }}
                           onKeyDown={(e) => handleKeyDownInput(e, idx, "atual")}
                           placeholder="Digite a leitura..."
                           autoFocus={idx === 0}
@@ -528,7 +561,7 @@ export default function GasPage() {
                       {/* Valor Unitário */}
                       <td className="py-2.5 px-3 text-right">
                         <span className="text-xs text-muted-foreground font-mono">
-                          {formatCurrency(Number(row.valor_unitario) || Number(valorUnitarioPadrao) || 19.95)}
+                          {formatCurrency(parseNumber(row.valor_unitario) || parseNumber(valorUnitarioPadrao) || 19.95)}
                         </span>
                       </td>
 
