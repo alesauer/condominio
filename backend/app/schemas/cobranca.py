@@ -133,6 +133,10 @@ class DemonstrativoAcaoEvento(BaseModel):
     descricao: str
     data: Optional[date] = None
 
+    class Config:
+        from_attributes = True
+
+
 
 class DemonstrativoFracaoAgua(BaseModel):
     descricao: str
