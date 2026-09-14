@@ -39,8 +39,8 @@ const menuGroups = [
   {
     title: "Financeiro",
     items: [
-      { href: "/financeiro/receitas", label: "Receitas", icon: TrendingUp },
       { href: "/financeiro/despesas", label: "Despesas", icon: TrendingDown },
+      { href: "/financeiro/receitas", label: "Receitas", icon: TrendingUp },
       { href: "/financeiro/cobrancas", label: "Cobranças", icon: CreditCard },
     ],
   },
