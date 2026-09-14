@@ -837,3 +837,96 @@ class TestAguaRateioService:
         assert exc.value.status_code == 404
 
 
+# ── LeituraGasService ──────────────────────────────────────────────
+
+class TestLeituraGasService:
+    async def test_obter_planilha_gas(self, mock_db):
+        from app.services import leitura_gas_service
+        from app.models.leitura_gas import LeituraGas
+
+        apto1 = Apartamento(id=uuid.uuid4(), numero="101", fracao_ideal=Decimal("0.5000"))
+        apto2 = Apartamento(id=uuid.uuid4(), numero="201", fracao_ideal=Decimal("0.5000"))
+
+        lg1 = LeituraGas(
+            id=uuid.uuid4(),
+            apartamento_id=apto1.id,
+            competencia=date(2026, 9, 1),
+            leitura_anterior=Decimal("626.00"),
+            leitura_atual=Decimal("628.00"),
+            consumo=Decimal("2.00"),
+            valor_unitario=Decimal("19.95"),
+            valor_cobrado=Decimal("39.90"),
+        )
+
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[apto1, apto2]),  # aptos
+            make_mock_result(scalars_all_return=[lg1]),  # leituras do mês
+            make_mock_result(scalar_one_or_none_return=None),  # leitura anterior apto2
+        ]
+
+        res = await leitura_gas_service.obter_planilha_gas(mock_db, date(2026, 9, 1))
+        assert res["competencia"] == date(2026, 9, 1)
+        assert len(res["itens"]) == 2
+        assert res["itens"][0]["apartamento_numero"] == "101"
+        assert res["itens"][0]["consumo"] == 2.0
+        assert res["itens"][0]["valor_cobrado"] == 39.9
+        assert res["total_consumo_m3"] == 2.0
+        assert res["total_valor_cobrado"] == 39.9
+
+    async def test_salvar_leituras_lote_upsert(self, mock_db):
+        from app.services import leitura_gas_service
+        from app.models.leitura_gas import LeituraGas
+
+        apto1 = Apartamento(id=uuid.uuid4(), numero="101", fracao_ideal=Decimal("0.5000"))
+        apto2 = Apartamento(id=uuid.uuid4(), numero="201", fracao_ideal=Decimal("0.5000"))
+
+        lg1 = LeituraGas(
+            id=uuid.uuid4(),
+            apartamento_id=apto1.id,
+            competencia=date(2026, 9, 1),
+            leitura_anterior=Decimal("626.00"),
+            leitura_atual=Decimal("627.00"),
+            consumo=Decimal("1.00"),
+            valor_unitario=Decimal("19.95"),
+            valor_cobrado=Decimal("19.95"),
+        )
+
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[lg1]),  # existentes para upsert
+            # retorno do obter_planilha_gas:
+            make_mock_result(scalars_all_return=[apto1, apto2]),  # aptos
+            make_mock_result(scalars_all_return=[lg1]),  # leituras atualizadas
+            make_mock_result(scalar_one_or_none_return=None),  # leitura anterior apto2
+        ]
+
+        data = {
+            "competencia": date(2026, 9, 1),
+            "valor_unitario_padrao": 19.95,
+            "leituras": [
+                {
+                    "apartamento_id": apto1.id,
+                    "leitura_anterior": 626.0,
+                    "leitura_atual": 628.0,
+                    "valor_unitario": 19.95,
+                },
+                {
+                    "apartamento_id": apto2.id,
+                    "leitura_anterior": 239.0,
+                    "leitura_atual": 240.0,
+                    "valor_unitario": 19.95,
+                }
+            ]
+        }
+
+        res = await leitura_gas_service.salvar_leituras_lote(mock_db, data)
+        assert res is not None
+        # Para apto1, atualizou lg1
+        assert lg1.leitura_atual == Decimal("628.0")
+        assert lg1.consumo == Decimal("2.0")
+        assert lg1.valor_cobrado == Decimal("39.90")
+        # Para apto2, chamou db.add com novo LeituraGas
+        assert mock_db.add.called
+        mock_db.commit.assert_awaited()
+
+
+
