@@ -191,19 +191,12 @@ async def _calcular_componentes_cobranca(
             cat_lower = cat.lower()
             is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
 
-            soma_parcial = Decimal("0.00")
             for apto in apartamentos:
                 if is_agua:
                     v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                 else:
                     v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                 despesas_map[apto.id] += v_apto
-                soma_parcial += v_apto
-
-            diff = v - soma_parcial
-            if diff != Decimal("0.00") and apartamentos:
-                maior = max(apartamentos, key=lambda a: fracoes_map.get(a.id, Decimal("0.0"))) if is_agua else apartamentos[0]
-                despesas_map[maior.id] += diff
 
         # Process parcelas: fraction only for water/copasa, equal for other expenses
         for p in parcelas:
@@ -215,19 +208,13 @@ async def _calcular_componentes_cobranca(
             cat_lower = cat.lower()
             is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower or cat_lower == "agua"
 
-            soma_parcial = Decimal("0.00")
             for apto in apartamentos:
                 if is_agua:
                     v_apto = (fracoes_map[apto.id] / soma_fracoes * v).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                 else:
                     v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
                 despesas_map[apto.id] += v_apto
-                soma_parcial += v_apto
 
-            diff = v - soma_parcial
-            if diff != Decimal("0.00") and apartamentos:
-                maior = max(apartamentos, key=lambda a: fracoes_map.get(a.id, Decimal("0.0"))) if is_agua else apartamentos[0]
-                despesas_map[maior.id] += diff
 
     # 3. Rateio de Água
     agua_map: Dict[Any, Decimal] = {apto.id: Decimal("0.00") for apto in apartamentos}
@@ -585,12 +572,6 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                 v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             rateio[apto.numero] = float(v_apto)
             total_despesas_por_apto[apto.numero] += v_apto
-            soma_parcial += v_apto
-        diff = v - soma_parcial
-        if diff != Decimal("0.00") and apartamentos:
-            maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
-            rateio[maior.numero] = float(Decimal(str(rateio[maior.numero])) + diff)
-            total_despesas_por_apto[maior.numero] += diff
 
         obs = d.observacao or ""
         if not obs and d.vencimento:
@@ -611,7 +592,6 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
         tot_parc = p.despesa.total_parcelas if p.despesa and p.despesa.total_parcelas else "?"
         desc_full = f"{desc} ({p.numero_parcela}/{tot_parc})"
         rateio = {}
-        soma_parcial = Decimal("0.00")
 
         desc_lower = desc.lower()
         cat_lower = (p.despesa.categoria if p.despesa and p.despesa.categoria else "").lower()
@@ -624,12 +604,7 @@ async def obter_demonstrativo_mensal(db: AsyncSession, competencia: Any) -> Dict
                 v_apto = (v / num_aptos).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             rateio[apto.numero] = float(v_apto)
             total_despesas_por_apto[apto.numero] += v_apto
-            soma_parcial += v_apto
-        diff = v - soma_parcial
-        if diff != Decimal("0.00") and apartamentos:
-            maior = max(apartamentos, key=lambda a: fracoes_map[a.id]) if is_agua else apartamentos[0]
-            rateio[maior.numero] = float(Decimal(str(rateio[maior.numero])) + diff)
-            total_despesas_por_apto[maior.numero] += diff
+
 
         obs = p.observacao or (p.despesa.observacao if p.despesa else "") or ""
         if not obs and p.vencimento:

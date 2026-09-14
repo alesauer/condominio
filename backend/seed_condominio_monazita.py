@@ -410,11 +410,23 @@ async def seed_monazita():
             "402": 750.00, # Cobertura
         }
 
+        despesas_setembro_2026 = [
+            {"descricao": "Cemig", "tipo": TipoDespesa.ordinaria, "categoria": "Energia", "valor": 180.72, "dia_venc": 5, "obs": "05/09/2026 - Déb. Automático"},
+            {"descricao": "Copasa", "tipo": TipoDespesa.ordinaria, "categoria": "Água", "valor": 1116.65, "dia_venc": 20, "obs": "20/09/2026 - Déb. Automático"},
+            {"descricao": "Zeladora Natália", "tipo": TipoDespesa.ordinaria, "categoria": "Serviços", "valor": 700.00, "dia_venc": 5, "obs": "05/09/2026 - PIX"},
+            {"descricao": "Adm Condomínio (Síndico)", "tipo": TipoDespesa.ordinaria, "categoria": "Administração", "valor": 300.00, "dia_venc": 5, "obs": "05/09/2026 - PIX"},
+            {"descricao": "Claro", "tipo": TipoDespesa.ordinaria, "categoria": "Internet", "valor": 136.00, "dia_venc": 15, "obs": "15/09/2026 - Boleto"},
+            {"descricao": "Compra itens jardim (05/05)", "tipo": TipoDespesa.ordinaria, "categoria": "Manutenção", "valor": 141.18, "dia_venc": 5, "obs": "Cartão Crédito Síndico"},
+            {"descricao": "Placas Marcação Vagas", "tipo": TipoDespesa.ordinaria, "categoria": "Manutenção", "valor": 85.50, "dia_venc": 5, "obs": "Mercado Livre - PIX"},
+        ]
+
         print("Gerando lançamentos de despesas de teste...")
         for ano, mes, situacao in meses_teste:
             dt_comp = date(ano, mes, 1)
-            for item in despesas_template:
+            itens_mes = despesas_setembro_2026 if (ano == 2026 and mes == 9) else despesas_template
+            for item in itens_mes:
                 dt_venc = date(ano, mes, item["dia_venc"])
+                obs = item.get("obs", "Lançamento mensal automático de teste")
                 if situacao == "pago":
                     st = StatusFinanceiro.pago
                     dt_pag = dt_venc
@@ -442,13 +454,13 @@ async def seed_monazita():
                         vencimento=dt_venc,
                         data_pagamento=dt_pag,
                         status=st,
-                        observacao="Lançamento mensal automático de teste",
+                        observacao=obs,
                         parcelamento=False,
                     )
                     db.add(desp)
 
-        # Despesa Extraordinária (Obra Reforma Fachada)
-        for i, (ano, mes, _) in enumerate(meses_teste[:4], start=1):
+        # Despesa Extraordinária (Obra Reforma Fachada - apenas meses 6, 7, 8)
+        for i, (ano, mes, _) in enumerate(meses_teste[:3], start=1):
             desc_extra = f"Reforma e Pintura Fachada ({i}/4)"
             dt_comp = date(ano, mes, 1)
             existing = await db.scalar(
@@ -465,8 +477,8 @@ async def seed_monazita():
                     valor=1500.00,
                     competencia=dt_comp,
                     vencimento=date(ano, mes, 20),
-                    data_pagamento=date(ano, mes, 20) if mes < 9 else None,
-                    status=StatusFinanceiro.pago if mes < 9 else StatusFinanceiro.pendente,
+                    data_pagamento=date(ano, mes, 20),
+                    status=StatusFinanceiro.pago,
                     observacao="Parcela obra fachada",
                     parcelamento=True,
                     total_parcelas=4,
