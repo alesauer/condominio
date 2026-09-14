@@ -42,6 +42,8 @@ class CobrancaGerarMensal(BaseModel):
     incluir_agua: bool = Field(default=True, description="Incluir rateio de água da competência se apurado")
     incluir_gas: bool = Field(default=True, description="Incluir consumo de gás da competência se apurado")
     separar_fundo_proprietario: bool = Field(default=False, description="Gera cobrança separada do Fundo de Reserva para o Proprietário quando alugado")
+    sobrescrever: bool = Field(default=False, description="Sobrescrever / regerar cobranças existentes do mês que não estejam pagas")
+    regerar: Optional[bool] = Field(default=None, description="Alias para sobrescrever")
     descricao: Optional[str] = Field(default=None, description="Descrição personalizada do lançamento (opcional)")
     acoes_eventos: Optional[List[DemonstrativoAcaoEventoInput]] = Field(default_factory=list, description="Ações e eventos realizados no mês")
 
@@ -83,6 +85,7 @@ class CobrancaPreviaResult(BaseModel):
     total_fundo_reserva: float = 0.0
     total_base: float = 0.0
     total_geral: float = 0.0
+    total_ja_gerados: int = 0
     apartamentos: List[CobrancaPreviaApartamento] = []
 
 

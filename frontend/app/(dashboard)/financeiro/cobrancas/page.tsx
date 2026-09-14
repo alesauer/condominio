@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   useCobrancas,
   usePagarCobranca,
+  useDeleteCobranca,
   useGerarCobrancasMensais,
   usePreviaCobrancasMensais,
   useDemonstrativoMensal,
@@ -50,6 +51,8 @@ import {
   AlertCircle,
   Sparkles,
   ShieldCheck,
+  RotateCcw,
+  RefreshCw,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -133,6 +136,7 @@ export default function CobrancasPage() {
     incluir_agua: true,
     incluir_gas: true,
     separar_fundo_proprietario: true,
+    sobrescrever: false,
     descricao: "",
   });
 
@@ -144,6 +148,7 @@ export default function CobrancasPage() {
       ...prev,
       competencia: competenciaParam,
       vencimento: `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-10`,
+      sobrescrever: false,
     }));
   }, [competenciaParam, selectedYear, selectedMonth]);
 
@@ -219,6 +224,7 @@ export default function CobrancasPage() {
   );
 
   const pagarMut = usePagarCobranca();
+  const deleteMut = useDeleteCobranca();
   const gerarMut = useGerarCobrancasMensais();
   const previaMut = usePreviaCobrancasMensais();
 
@@ -237,7 +243,10 @@ export default function CobrancasPage() {
           incluir_gas: formGerar.incluir_gas,
           separar_fundo_proprietario: formGerar.separar_fundo_proprietario,
         })
-        .then((res) => setPrevia(res))
+        .then((res) => {
+          setPrevia(res);
+          // Se todos ou alguns já foram gerados, podemos sinalizar
+        })
         .catch(() => setPrevia(null));
     }, 200);
 
@@ -264,6 +273,18 @@ export default function CobrancasPage() {
     }
   };
 
+  const handleDeleteCobranca = async (id: string, aptoDisplay: string) => {
+    if (!confirm(`Deseja realmente excluir a cobrança do ${aptoDisplay}?`)) return;
+    try {
+      await deleteMut.mutateAsync(id);
+      toast.success("Cobrança excluída com sucesso!");
+      refetchDemonstrativo();
+      refetchCobrancas();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Erro ao excluir cobrança.");
+    }
+  };
+
   const handleGerarMensal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -275,6 +296,7 @@ export default function CobrancasPage() {
         incluir_agua: formGerar.incluir_agua,
         incluir_gas: formGerar.incluir_gas,
         separar_fundo_proprietario: formGerar.separar_fundo_proprietario,
+        sobrescrever: formGerar.sobrescrever,
         descricao: formGerar.descricao || undefined,
         acoes_eventos: acoesEventos
           .filter((a) => a.titulo.trim() && a.descricao.trim())
@@ -660,12 +682,50 @@ export default function CobrancasPage() {
                   )}
                 </div>
 
+                {/* Opção de Regerar / Sobrescrever caso já existam cobranças geradas */}
+                {((previa?.total_ja_gerados ?? 0) > 0 || previa?.apartamentos?.some((a) => a.ja_gerado)) && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3.5 space-y-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <RotateCcw className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                          Atenção: Já existem cobranças geradas para esta competência (
+                          {previa?.total_ja_gerados ?? previa?.apartamentos?.filter((a) => a.ja_gerado).length} apartamento(s)).
+                        </p>
+                        <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                          Cobranças já <strong>PAGAS</strong> serão preservadas. As cobranças pendentes serão recalculadas e substituídas pelos novos valores caso você marque a opção abaixo.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-amber-500/20">
+                      <Label htmlFor="sobrescrever" className="text-xs font-medium cursor-pointer text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                        <RefreshCw className="h-3.5 w-3.5 text-amber-600" />
+                        Regerar cobranças existentes (substituir pendentes)
+                      </Label>
+                      <Switch
+                        id="sobrescrever"
+                        checked={formGerar.sobrescrever}
+                        onCheckedChange={(v) => setFormGerar({ ...formGerar, sobrescrever: v })}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <DialogFooter className="pt-2">
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={gerarMut.isPending}>
-                    {gerarMut.isPending ? "Gerando Cobranças..." : "Confirmar e Gerar Cobranças"}
+                  <Button
+                    type="submit"
+                    disabled={gerarMut.isPending}
+                    variant={formGerar.sobrescrever ? "default" : "default"}
+                    className={formGerar.sobrescrever ? "bg-amber-600 hover:bg-amber-700 text-white" : ""}
+                  >
+                    {gerarMut.isPending
+                      ? "Processando..."
+                      : formGerar.sobrescrever
+                      ? "Confirmar e Regerar Cobranças"
+                      : "Confirmar e Gerar Cobranças"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -829,16 +889,28 @@ export default function CobrancasPage() {
                                 </Button>
                               )}
                               {c.status !== "pago" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handlePagar(c.id)}
-                                  disabled={pagarMut.isPending}
-                                  className="h-8 text-xs"
-                                >
-                                  <CheckCircle className="mr-1 h-3.5 w-3.5 text-emerald-500" />
-                                  Pagar
-                                </Button>
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handlePagar(c.id)}
+                                    disabled={pagarMut.isPending}
+                                    className="h-8 text-xs"
+                                  >
+                                    <CheckCircle className="mr-1 h-3.5 w-3.5 text-emerald-500" />
+                                    Pagar
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDeleteCobranca(c.id, aptoDisplay)}
+                                    disabled={deleteMut.isPending}
+                                    className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50"
+                                    title="Excluir cobrança pendente"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
                               )}
                               {c.status === "pago" && c.data_pagamento && (
                                 <span className="text-xs text-muted-foreground whitespace-nowrap">

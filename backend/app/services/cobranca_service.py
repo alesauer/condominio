@@ -86,6 +86,30 @@ async def pagar_cobranca(db: AsyncSession, cobranca_id: str, usuario=None) -> Co
     return cob
 
 
+async def delete_cobranca(db: AsyncSession, cobranca_id: str, usuario=None) -> None:
+    cob = await get_cobranca(db, cobranca_id)
+    if cob.status == StatusFinanceiro.pago:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível excluir uma cobrança com status pago.",
+        )
+    await db.delete(cob)
+    await registrar_auditoria(
+        db,
+        acao="EXCLUSAO",
+        entidade_tipo="cobrancas",
+        entidade_id=cob.id,
+        dados_anteriores={
+            "apartamento_id": str(cob.apartamento_id),
+            "valor": float(cob.valor),
+            "competencia": str(cob.competencia),
+            "descricao": cob.descricao,
+        },
+        usuario=usuario,
+    )
+    await db.commit()
+
+
 MESES_PT = [
     "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
@@ -352,6 +376,8 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
             "ja_gerado": apto.id in existentes_apto_ids,
         })
 
+    total_ja_gerados = sum(1 for a in detalhes_aptos if a["ja_gerado"])
+
     return {
         "competencia": competencia,
         "vencimento": vencimento,
@@ -361,6 +387,7 @@ async def calcular_previa_cobrancas(db: AsyncSession, data: dict) -> Dict[str, A
         "total_fundo_reserva": float(calc["total_fundo_reserva"]),
         "total_base": float(calc["total_base"]),
         "total_geral": float(total_geral),
+        "total_ja_gerados": total_ja_gerados,
         "apartamentos": detalhes_aptos,
     }
 
@@ -373,6 +400,7 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
     incluir_agua: bool = data.get("incluir_agua", True)
     incluir_gas: bool = data.get("incluir_gas", True)
     separar_fundo: bool = bool(data.get("separar_fundo_proprietario", False))
+    sobrescrever: bool = bool(data.get("sobrescrever", False) or data.get("regerar", False))
     descricao_custom: str = data.get("descricao")
 
     calc = await _calcular_componentes_cobranca(
@@ -389,11 +417,26 @@ async def gerar_cobrancas_mensais(db: AsyncSession, data: dict, usuario=None) ->
     agua_map = calc["agua_map"]
     gas_map = calc["gas_map"]
 
-    # Busca cobranças já existentes para não duplicar
+    # Busca cobranças já existentes para não duplicar ou regerar
     existentes_result = await db.execute(
-        select(Cobranca.apartamento_id).where(Cobranca.competencia == competencia)
+        select(Cobranca).where(Cobranca.competencia == competencia)
     )
-    existentes_apto_ids = set(existentes_result.scalars().all())
+    cobrancas_existentes = existentes_result.scalars().all()
+
+    if sobrescrever and cobrancas_existentes:
+        # Se sobrescrever/regerar estiver habilitado, remove cobranças não pagas
+        for c in cobrancas_existentes:
+            if c.status != StatusFinanceiro.pago:
+                await db.delete(c)
+        await db.flush()
+
+        # Recarrega os IDs que permanecem (ex: cobranças já pagas)
+        restantes_result = await db.execute(
+            select(Cobranca.apartamento_id).where(Cobranca.competencia == competencia)
+        )
+        existentes_apto_ids = set(restantes_result.scalars().all())
+    else:
+        existentes_apto_ids = set([c.apartamento_id for c in cobrancas_existentes])
 
     geradas: List[Cobranca] = []
     total_valor = Decimal("0.00")

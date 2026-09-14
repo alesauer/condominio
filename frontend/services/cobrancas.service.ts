@@ -21,6 +21,8 @@ export interface GerarCobrancasPayload {
   incluir_agua?: boolean;
   incluir_gas?: boolean;
   separar_fundo_proprietario?: boolean;
+  sobrescrever?: boolean;
+  regerar?: boolean;
   descricao?: string;
   acoes_eventos?: AcaoEventoPayload[];
 }
@@ -57,6 +59,7 @@ export interface CobrancaPreviaResult {
   total_fundo_reserva?: number;
   total_base?: number;
   total_geral: number;
+  total_ja_gerados?: number;
   apartamentos: CobrancaPreviaApartamento[];
 }
 
@@ -73,6 +76,17 @@ export function usePagarCobranca() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.put(`/cobrancas/${id}/pagar`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useDeleteCobranca() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/cobrancas/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [KEY] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });

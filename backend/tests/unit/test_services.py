@@ -564,6 +564,101 @@ class TestCobrancaService:
         assert mock_db.add.call_count >= 2
         mock_db.commit.assert_awaited()
 
+    async def test_gerar_cobrancas_mensais_sobrescrever(self, mock_db):
+        from app.services import cobranca_service
+        from app.models.cobranca import Cobranca
+        from app.models.despesa import Despesa
+
+        apto1 = Apartamento(id=uuid.uuid4(), numero="101", fracao_ideal=Decimal("0.5000"))
+        apto2 = Apartamento(id=uuid.uuid4(), numero="201", fracao_ideal=Decimal("0.5000"))
+
+        cob_paga = Cobranca(
+            id=uuid.uuid4(),
+            apartamento_id=apto1.id,
+            competencia=date(2026, 9, 1),
+            vencimento=date(2026, 9, 10),
+            valor=Decimal("200.00"),
+            valor_total=Decimal("200.00"),
+            status=StatusFinanceiro.pago,
+        )
+        cob_pendente = Cobranca(
+            id=uuid.uuid4(),
+            apartamento_id=apto2.id,
+            competencia=date(2026, 9, 1),
+            vencimento=date(2026, 9, 10),
+            valor=Decimal("200.00"),
+            valor_total=Decimal("200.00"),
+            status=StatusFinanceiro.pendente,
+        )
+
+        desp = Despesa(id=uuid.uuid4(), descricao="Manutenção", valor=Decimal("600.00"), competencia=date(2026, 9, 1), parcelamento=False)
+
+        mock_db.execute.side_effect = [
+            make_mock_result(scalars_all_return=[apto1, apto2]), # aptos
+            make_mock_result(scalars_all_return=[desp]), # despesas
+            make_mock_result(scalars_all_return=[]), # parcelas
+            make_mock_result(scalars_all_return=[cob_paga, cob_pendente]), # cobrancas existentes
+            # após apagar pendente:
+            make_mock_result(scalars_all_return=[cob_paga.apartamento_id]), # cobrancas existentes restantes
+            make_mock_result(scalars_all_return=[]), # recarregadas
+        ]
+
+        data = {
+            "competencia": date(2026, 9, 1),
+            "vencimento": date(2026, 9, 10),
+            "valor_fundo_reserva": 0.0,
+            "incluir_despesas": True,
+            "incluir_agua": False,
+            "incluir_gas": False,
+            "sobrescrever": True,
+        }
+
+        res = await cobranca_service.gerar_cobrancas_mensais(mock_db, data)
+        # Deletou a cobrança pendente, mas não a paga
+        mock_db.delete.assert_called_once_with(cob_pendente)
+        mock_db.commit.assert_awaited()
+
+    async def test_delete_cobranca_pendente_success(self, mock_db):
+        from app.services import cobranca_service
+        from app.models.cobranca import Cobranca
+        cob_id = str(uuid.uuid4())
+        cob = Cobranca(
+            id=uuid.UUID(cob_id),
+            apartamento_id=uuid.uuid4(),
+            descricao="Taxa Condomínio",
+            competencia=date(2026, 9, 1),
+            vencimento=date(2026, 9, 10),
+            valor=Decimal("300.00"),
+            valor_total=Decimal("300.00"),
+            status=StatusFinanceiro.pendente,
+        )
+        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=cob)
+
+        await cobranca_service.delete_cobranca(mock_db, cob_id)
+        mock_db.delete.assert_called_once_with(cob)
+        mock_db.commit.assert_awaited()
+
+    async def test_delete_cobranca_paga_fails(self, mock_db):
+        from app.services import cobranca_service
+        from app.models.cobranca import Cobranca
+        cob_id = str(uuid.uuid4())
+        cob = Cobranca(
+            id=uuid.UUID(cob_id),
+            apartamento_id=uuid.uuid4(),
+            descricao="Taxa Condomínio",
+            competencia=date(2026, 9, 1),
+            vencimento=date(2026, 9, 10),
+            valor=Decimal("300.00"),
+            valor_total=Decimal("300.00"),
+            status=StatusFinanceiro.pago,
+        )
+        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=cob)
+
+        with pytest.raises(HTTPException) as exc:
+            await cobranca_service.delete_cobranca(mock_db, cob_id)
+        assert exc.value.status_code == 400
+        assert "Não é possível excluir uma cobrança com status pago" in exc.value.detail
+
     async def test_obter_demonstrativo_mensal(self, mock_db):
         from app.services import cobranca_service
         from app.models.despesa import Despesa

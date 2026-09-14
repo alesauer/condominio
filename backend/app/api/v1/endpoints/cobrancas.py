@@ -124,3 +124,13 @@ async def pagar_cobranca(
     current_user=Depends(admin_required),
 ):
     return await cobranca_service.pagar_cobranca(db, cobranca_id, usuario=current_user)
+
+
+@router.delete("/{cobranca_id}", status_code=204)
+async def delete_cobranca(
+    cobranca_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(admin_required),
+):
+    await cobranca_service.delete_cobranca(db, cobranca_id, usuario=current_user)
+    return None
