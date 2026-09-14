@@ -1266,45 +1266,167 @@ async def enviar_email_demonstrativo(db: AsyncSession, data: Any, usuario=None) 
         nome_resp = dest["nome"]
         dest_email = dest["email"]
 
-        # Busca dados da cobrança do apartamento se existir
-        cobranca_apto = next((c for c in demonstrativo.get("cobrancas_moradores", []) if c.get("apartamento_numero") == apto_num), None)
-        valor_apto_str = f"R$ {cobranca_apto['valor_a_pagar']:.2f}".replace(".", ",") if cobranca_apto else ""
-        venc_str = cobranca_apto["vencimento"].strftime('%d/%m/%Y') if cobranca_apto and cobranca_apto.get("vencimento") else f"10/{comp.month:02d}/{comp.year}"
+        # ── Extração da Memória de Cálculo Individual do Apartamento ────
+        despesas_itens = demonstrativo.get("despesas_itens", [])
+        despesas_comuns_list = []
+        despesa_agua_obj = None
+        subtotal_despesas_comuns = 0.0
 
-        is_alugado_unit = cobranca_apto.get("is_alugado") if cobranca_apto else False
-        is_proprietario_dest = "(Proprietário)" in nome_resp or (cobranca_apto and dest_email == cobranca_apto.get("proprietario_email"))
-        is_inquilino_dest = "(Inquilino)" in nome_resp or (cobranca_apto and dest_email == cobranca_apto.get("responsavel_email") and is_alugado_unit)
+        for d in despesas_itens:
+            desc = d.get("descricao", "")
+            desc_lower = desc.lower()
+            is_agua = "copasa" in desc_lower or "água" in desc_lower or "agua" in desc_lower
+            val_total = float(d.get("valor") or 0.0)
+            rateio_map = d.get("rateio_por_apto", {})
+            val_apto = float(rateio_map.get(apto_num) or 0.0)
 
-        if is_alugado_unit and is_proprietario_dest:
-            val_cota = cobranca_apto.get("cota_proprietario") or 250.0
-            val_cota_str = f"R$ {val_cota:.2f}".replace(".", ",")
-            titulo_resumo = f"RESUMO DA COTA DO PROPRIETÁRIO (APTO {apto_num})"
-            linha_valor_texto = f"- Cota do Proprietário (Fundo de Reserva / Obras): {val_cota_str}\n- Total Geral do Imóvel: {valor_apto_str}"
-            linha_valor_html = f"""
-                <div>🟣 <strong>Cota do Proprietário (Fundo de Reserva / Obras):</strong> <span style="font-size: 16px; font-weight: bold; color: #6b21a8;">{val_cota_str}</span></div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Total Geral do Imóvel (com ordinárias do inquilino): {valor_apto_str}</div>
+            if is_agua:
+                despesa_agua_obj = {
+                    "descricao": desc,
+                    "valor_total": val_total,
+                    "valor_apto": val_apto,
+                }
+            else:
+                subtotal_despesas_comuns += val_apto
+                despesas_comuns_list.append({
+                    "descricao": desc,
+                    "valor_total": val_total,
+                    "valor_apto": val_apto,
+                })
+
+        # Água (COPASA)
+        fracoes_agua = demonstrativo.get("fracoes_agua", [])
+        fracao_agua_str = "14,2857%"
+        for f in fracoes_agua:
+            if apto_num in f.get("descricao", ""):
+                fracao_agua_str = f.get("percentual_formatado", "14,2857%")
+                break
+        valor_copasa_total = despesa_agua_obj["valor_total"] if despesa_agua_obj else 0.0
+        valor_agua_apto = despesa_agua_obj["valor_apto"] if despesa_agua_obj else 0.0
+
+        # Gás Individual
+        gas_data = demonstrativo.get("gas", {})
+        leituras_gas = gas_data.get("leituras", [])
+        leitura_apto = next((g for g in leituras_gas if g.get("apartamento_numero") == apto_num), None)
+        leitura_ant = float(leitura_apto.get("leitura_anterior") or 0.0) if leitura_apto else 0.0
+        leitura_atual = float(leitura_apto.get("leitura_atual") or 0.0) if leitura_apto else 0.0
+        consumo_m3 = float(leitura_apto.get("m3_usado") or 0.0) if leitura_apto else 0.0
+        preco_m3 = float(gas_data.get("preco_m3") or 19.95)
+        valor_gas_apto = float(leitura_apto.get("valor_a_pagar") or 0.0) if leitura_apto else 0.0
+
+        # Fundo de Reserva
+        fundo_data = demonstrativo.get("fundo_reserva", {})
+        rateio_fundo = fundo_data.get("rateio_por_apto", {})
+        valor_fundo_apto = float(rateio_fundo.get(apto_num) if apto_num in rateio_fundo else (fundo_data.get("valor_unitario") or 250.0))
+
+        # Total Geral do Imóvel
+        total_imovel_calc = subtotal_despesas_comuns + valor_agua_apto + valor_gas_apto + valor_fundo_apto
+        cota_inquilino_calc = subtotal_despesas_comuns + valor_agua_apto + valor_gas_apto
+        cota_proprietario_calc = valor_fundo_apto
+
+        # Formatações em Moeda
+        subtotal_despesas_str = f"R$ {subtotal_despesas_comuns:.2f}".replace(".", ",")
+        valor_copasa_total_str = f"R$ {valor_copasa_total:.2f}".replace(".", ",")
+        valor_agua_str = f"R$ {valor_agua_apto:.2f}".replace(".", ",")
+        preco_m3_str = f"R$ {preco_m3:.2f}".replace(".", ",")
+        valor_gas_str = f"R$ {valor_gas_apto:.2f}".replace(".", ",")
+        valor_fundo_str = f"R$ {valor_fundo_apto:.2f}".replace(".", ",")
+        total_imovel_str = f"R$ {total_imovel_calc:.2f}".replace(".", ",")
+        cota_inquilino_str = f"R$ {cota_inquilino_calc:.2f}".replace(".", ",")
+        cota_proprietario_str = f"R$ {cota_proprietario_calc:.2f}".replace(".", ",")
+
+        # Construção das Linhas de Despesas Comuns (HTML & Texto)
+        linhas_desp_html = ""
+        linhas_desp_texto = ""
+        for desp_item in despesas_comuns_list:
+            v_tot_str = f"R$ {desp_item['valor_total']:.2f}".replace(".", ",")
+            v_apt_str = f"R$ {desp_item['valor_apto']:.2f}".replace(".", ",")
+            linhas_desp_html += f"""
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 6px 12px; color: #334155;">{desp_item['descricao']}</td>
+                <td style="padding: 6px 12px; text-align: right; color: #64748b;">{v_tot_str}</td>
+                <td style="padding: 6px 12px; text-align: right; color: #64748b;">1/7 (14,2857%)</td>
+                <td style="padding: 6px 12px; text-align: right; font-weight: 500; color: #0f172a;">{v_apt_str}</td>
+              </tr>
             """
-        elif is_alugado_unit and is_inquilino_dest:
-            val_cota = cobranca_apto.get("cota_inquilino") or (cobranca_apto['valor_a_pagar'] - 250.0)
-            val_cota_str = f"R$ {val_cota:.2f}".replace(".", ",")
-            titulo_resumo = f"RESUMO DA COTA DO INQUILINO / LOCATÁRIO (APTO {apto_num})"
-            linha_valor_texto = f"- Cota do Inquilino (Despesas Ordinárias + Água + Gás): {val_cota_str}\n(O Fundo de Reserva é de responsabilidade exclusiva do Proprietário)"
-            linha_valor_html = f"""
-                <div>🔵 <strong>Cota do Inquilino (Despesas Ordinárias + Água + Gás):</strong> <span style="font-size: 16px; font-weight: bold; color: #0369a1;">{val_cota_str}</span></div>
-                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">* O Fundo de Reserva é faturado diretamente ao Proprietário conforme a Lei do Inquilinato. Total Imóvel: {valor_apto_str}</div>
-            """
+            linhas_desp_texto += f"   - {desp_item['descricao']}: {v_apt_str} (Total Geral: {v_tot_str})\n"
+
+        if not linhas_desp_texto:
+            linhas_desp_texto = "   (Nenhuma despesa comum lançada no mês)\n"
+
+        # Dados de Locação e Resumo
+        apto_header_info = next((h for h in demonstrativo.get("apartamentos_header", []) if h.get("numero") == apto_num), None)
+        is_alugado_unit = apto_header_info.get("is_alugado", False) if apto_header_info else False
+        prop_email = (apto_header_info.get("proprietario_email") or "").strip().lower() if apto_header_info else ""
+        is_dest_proprietario = (dest_email.strip().lower() == prop_email) if prop_email else False
+
+        venc_date = demonstrativo.get("vencimento_padrao") or date(comp.year, comp.month, 10)
+        venc_str = venc_date.strftime("%d/%m/%Y") if hasattr(venc_date, "strftime") else str(venc_date)
+
+        if is_alugado_unit:
+            if is_dest_proprietario:
+                titulo_resumo = f"Resumo de Cobrança — Apto {apto_num} (Cota do Proprietário)"
+                linha_valor_texto = f"- Valor a Pagar (Fundo de Reserva): {cota_proprietario_str}\n- Total do Imóvel: {total_imovel_str}"
+                linha_valor_html = f"<div>💰 <strong>Valor a Pagar (Fundo de Reserva):</strong> <span style=\"font-size: 16px; color: #7e22ce; font-weight: bold;\">{cota_proprietario_str}</span></div><div style=\"font-size: 12px; color: #64748b; margin-top: 4px;\">(Total integral do condomínio da unidade: {total_imovel_str})</div>"
+            else:
+                titulo_resumo = f"Resumo de Cobrança — Apto {apto_num} (Cota do Inquilino)"
+                linha_valor_texto = f"- Valor a Pagar (Ordinárias + Consumos): {cota_inquilino_str}\n- Total do Imóvel: {total_imovel_str}"
+                linha_valor_html = f"<div>💰 <strong>Valor a Pagar (Cota do Inquilino):</strong> <span style=\"font-size: 16px; color: #0369a1; font-weight: bold;\">{cota_inquilino_str}</span></div><div style=\"font-size: 12px; color: #64748b; margin-top: 4px;\">(Total integral do condomínio da unidade: {total_imovel_str})</div>"
         else:
-            titulo_resumo = f"RESUMO DA SUA UNIDADE (APTO {apto_num})"
-            linha_valor_texto = f"- Valor do Condomínio: {valor_apto_str}" if valor_apto_str else ""
-            linha_valor_html = f'<div>💰 <strong>Valor do Condomínio:</strong> <span style="font-size: 16px; font-weight: bold; color: #0f2c59;">{valor_apto_str}</span></div>' if valor_apto_str else ''
+            titulo_resumo = f"Resumo de Cobrança — Apto {apto_num}"
+            linha_valor_texto = f"- Valor Total a Pagar: {total_imovel_str}"
+            linha_valor_html = f"<div>💰 <strong>Valor Total a Pagar:</strong> <span style=\"font-size: 16px; color: #0f2c59; font-weight: bold;\">{total_imovel_str}</span></div>"
 
+        # Bloco de Divisão Locação (HTML e Texto)
+        bloco_locacao_html = ""
+        bloco_locacao_texto = ""
+        if is_alugado_unit:
+            bloco_locacao_html = f"""
+              <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 6px; padding: 12px; margin-top: 14px;">
+                <div style="font-weight: bold; color: #6b21a8; font-size: 12px; margin-bottom: 6px;">DIVISÃO DE RESPONSABILIDADE (IMÓVEL ALUGADO):</div>
+                <div style="font-size: 13px; color: #0369a1; margin-bottom: 4px;">🔵 <strong>Cota do Inquilino (Ordinárias + Água + Gás):</strong> <strong>{cota_inquilino_str}</strong></div>
+                <div style="font-size: 13px; color: #7e22ce;">🟣 <strong>Cota do Proprietário (Fundo de Reserva):</strong> <strong>{cota_proprietario_str}</strong></div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 6px;">* Conforme a Lei do Inquilinato (Lei nº 8.245/91), o Fundo de Reserva é de obrigação do proprietário.</div>
+              </div>
+            """
+            bloco_locacao_texto = f"""
+DIVISÃO DE RESPONSABILIDADE (IMÓVEL ALUGADO):
+- Cota do Inquilino (Ordinárias + Água + Gás): {cota_inquilino_str}
+- Cota do Proprietário (Fundo de Reserva): {cota_proprietario_str}
+* O Fundo de Reserva é de obrigação exclusiva do Proprietário (Lei nº 8.245/91).
+"""
+
+        # Corpo em Texto Plano com Memória de Cálculo
         corpo_texto = f"""Olá, {nome_resp}!
 
-Segue em anexo o Demonstrativo Mensal de Fechamento do Condomínio Residencial Monazita referente à competência {comp_formatada}.
+Segue o Demonstrativo Mensal e a Memória de Cálculo Individual do Condomínio Residencial Monazita referente à competência {comp_formatada}.
 
 {titulo_resumo}:
 - Vencimento: {venc_str}
 {linha_valor_texto}
+
+======================================================================
+MEMÓRIA DE CÁLCULO E DETALHAMENTO INDIVIDUAL — APTO {apto_num}
+======================================================================
+1. DESPESAS COMUNS ORDINÁRIAS (Rateio Igualitário):
+{linhas_desp_texto}   Subtotal Despesas Comuns: {subtotal_despesas_str}
+
+2. RATEIO DE ÁGUA (COPASA):
+   - Fatura COPASA do Condomínio: {valor_copasa_total_str}
+   - Fração Ideal Aplicada: {fracao_agua_str}
+   - Cota de Água do Apto: {valor_agua_str}
+
+3. CONSUMO INDIVIDUAL DE GÁS:
+   - Leitura Anterior: {leitura_ant:.2f} m³ | Leitura Atual: {leitura_atual:.2f} m³
+   - Consumo Apurado: {consumo_m3:.2f} m³ (Preço: {preco_m3_str}/m³)
+   - Cota de Gás do Apto: {valor_gas_str}
+
+4. FUNDO DE RESERVA / OBRAS:
+   - Valor Destinado ao Fundo: {valor_fundo_str}
+
+----------------------------------------------------------------------
+TOTAL CONSOLIDADO DO APTO {apto_num}: {total_imovel_str}
+----------------------------------------------------------------------{bloco_locacao_texto}
 
 {msg_custom if msg_custom else ""}
 
@@ -1314,6 +1436,7 @@ Atenciosamente,
 Administração do Condomínio Residencial Monazita
 """
 
+        # Corpo em HTML com Tabela Estilizada da Memória de Cálculo
         corpo_html = f"""
 <!DOCTYPE html>
 <html>
@@ -1321,12 +1444,16 @@ Administração do Condomínio Residencial Monazita
   <meta charset="utf-8">
   <style>
     body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }}
-    .container {{ max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
+    .container {{ max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
     .header {{ background: #0f2c59; color: #ffffff; padding: 24px; text-align: center; }}
     .header h1 {{ margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; }}
     .header p {{ margin: 4px 0 0 0; font-size: 13px; opacity: 0.9; }}
     .content {{ padding: 24px; line-height: 1.6; font-size: 14px; }}
     .card {{ background: #f1f5f9; border-left: 4px solid #0f2c59; padding: 14px 18px; border-radius: 6px; margin: 18px 0; }}
+    .calc-table {{ width: 100%; border-collapse: collapse; font-size: 12px; margin: 18px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }}
+    .calc-table th {{ background: #f8fafc; padding: 8px 10px; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }}
+    .calc-table td {{ padding: 7px 10px; }}
+    .section-title {{ font-weight: bold; font-size: 12px; padding: 6px 10px !important; }}
     .alert-box {{ background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; padding: 12px; border-radius: 6px; font-size: 12px; font-style: italic; margin: 16px 0; }}
     .footer {{ background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px; text-align: center; font-size: 11px; color: #64748b; }}
   </style>
@@ -1339,12 +1466,83 @@ Administração do Condomínio Residencial Monazita
     </div>
     <div class="content">
       <p>Olá, <strong>{nome_resp}</strong> (Apartamento {apto_num}),</p>
-      <p>Informamos que o <strong>Demonstrativo Mensal Consolidado</strong> do condomínio relativo ao mês de <strong>{comp_formatada}</strong> já foi apurado e está disponível.</p>
+      <p>Informamos que o <strong>Demonstrativo Mensal Consolidado</strong> e a <strong>Memória de Cálculo Individual</strong> do condomínio relativos ao mês de <strong>{comp_formatada}</strong> já foram apurados e estão disponíveis abaixo.</p>
       
       <div class="card">
         <div style="font-weight: bold; font-size: 13px; margin-bottom: 8px; color: #0f2c59;">{titulo_resumo}</div>
         <div>📅 <strong>Vencimento:</strong> {venc_str}</div>
         {linha_valor_html}
+      </div>
+
+      <!-- Tabela de Memória de Cálculo Individual -->
+      <div style="margin: 22px 0; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden; background: #ffffff;">
+        <div style="background: #1e293b; color: #ffffff; padding: 10px 14px; font-weight: bold; font-size: 13px;">
+          📊 CÁLCULO E DETALHAMENTO INDIVIDUAL — APTO {apto_num}
+        </div>
+        
+        <table class="calc-table" style="margin: 0; border: none;">
+          <thead>
+            <tr>
+              <th style="text-align: left;">Item / Descrição</th>
+              <th style="text-align: right;">Total Prédio</th>
+              <th style="text-align: right;">Fração / Medição</th>
+              <th style="text-align: right;">Sua Cota (R$)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- 1. Despesas Comuns -->
+            <tr style="background: #f1f5f9; color: #334155;">
+              <td colspan="4" class="section-title">🏢 1. DESPESAS COMUNS (Rateio Igualitário)</td>
+            </tr>
+            {linhas_desp_html}
+            <tr style="background: #f8fafc; font-weight: 600; border-bottom: 1px solid #e2e8f0;">
+              <td colspan="3" style="text-align: right; color: #475569; padding: 6px 10px;">Subtotal Despesas Comuns:</td>
+              <td style="text-align: right; color: #0f172a; padding: 6px 10px;">{subtotal_despesas_str}</td>
+            </tr>
+
+            <!-- 2. Rateio de Água -->
+            <tr style="background: #eff6ff; color: #1e40af;">
+              <td colspan="4" class="section-title">💧 2. RATEIO DE ÁGUA (COPASA)</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td>Fatura de Água / Esgoto</td>
+              <td style="text-align: right; color: #64748b;">{valor_copasa_total_str}</td>
+              <td style="text-align: right; color: #2563eb; font-weight: 500;">{fracao_agua_str}</td>
+              <td style="text-align: right; font-weight: bold; color: #1e40af;">{valor_agua_str}</td>
+            </tr>
+
+            <!-- 3. Gás Individual -->
+            <tr style="background: #fffbeb; color: #92400e;">
+              <td colspan="4" class="section-title">🔥 3. CONSUMO INDIVIDUAL DE GÁS</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td>
+                Gás Canalizado<br>
+                <span style="font-size: 10px; color: #78350f;">Ant: {leitura_ant:.1f} m³ | Atual: {leitura_atual:.1f} m³</span>
+              </td>
+              <td style="text-align: right; font-size: 11px; color: #78350f;">{preco_m3_str}/m³</td>
+              <td style="text-align: right; font-weight: bold; color: #b45309;">{consumo_m3:.1f} m³</td>
+              <td style="text-align: right; font-weight: bold; color: #92400e;">{valor_gas_str}</td>
+            </tr>
+
+            <!-- 4. Fundo de Reserva -->
+            <tr style="background: #f0fdf4; color: #166534;">
+              <td colspan="4" class="section-title">🛡️ 4. FUNDO DE RESERVA / OBRAS</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td colspan="2">Fundo de Reserva do Condomínio</td>
+              <td style="text-align: right; color: #16a34a;">Fixo por Apto</td>
+              <td style="text-align: right; font-weight: bold; color: #166534;">{valor_fundo_str}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr style="background: #f8fafc; border-top: 2px solid #0f172a; font-size: 13px;">
+              <td colspan="3" style="padding: 8px 10px; font-weight: bold; color: #0f172a;">TOTAL CONSOLIDADO DO APTO {apto_num}:</td>
+              <td style="padding: 8px 10px; text-align: right; font-weight: 800; color: #0f172a; font-size: 15px;">{total_imovel_str}</td>
+            </tr>
+          </tfoot>
+        </table>
+        {bloco_locacao_html}
       </div>
 
       {f'<p style="background: #faf5ff; border: 1px solid #e9d5ff; padding: 10px; border-radius: 6px; font-size: 13px; color: #6b21a8;"><strong>Mensagem da Administração:</strong><br>{msg_custom}</p>' if msg_custom else ''}
@@ -1354,7 +1552,7 @@ Administração do Condomínio Residencial Monazita
       </div>
 
       <p style="font-size: 13px; color: #475569;">
-        📎 <em>O relatório detalhado em PDF com a memória de cálculo completa de despesas, água, gás e fundo de reserva segue em anexo a este e-mail.</em>
+        📎 <em>O relatório consolidado em PDF com a prestação de contas de todo o condomínio segue em anexo a este e-mail.</em>
       </p>
     </div>
     <div class="footer">
