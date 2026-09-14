@@ -77,7 +77,9 @@ async def send_email(
             server.starttls()
 
         if settings.SMTP_USER and settings.SMTP_PASSWORD:
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            smtp_pwd = settings.SMTP_PASSWORD.replace(" ", "").strip()
+            server.login(settings.SMTP_USER, smtp_pwd)
+
 
         server.sendmail(settings.EMAIL_FROM, destinatarios, msg.as_string())
         server.quit()
