@@ -10,33 +10,41 @@ from app.models.assembleia import Assembleia
 from app.models.pauta import Pauta
 from app.models.ata import Ata
 from app.models.documento import Documento
+from app.schemas.assembleia import (
+    AssembleiaCreate,
+    AssembleiaUpdate,
+    AssembleiaResponse,
+    AtaResponse,
+)
+from app.schemas.common import PaginatedResponse
 from app.utils.pagination import paginate
 from app.utils.file_storage import save_upload, get_file_path, delete_file
-from pydantic import BaseModel
-from datetime import date, time
-from typing import Optional, List
+from datetime import time
+from typing import Optional
 from uuid import UUID
+import logging
 
+logger = logging.getLogger("condo.assembleias")
 router = APIRouter()
 
 
-class PautaCreate(BaseModel):
-    ordem: int
-    descricao: str
+def parse_time_safe(val: Optional[str]) -> Optional[time]:
+    if not val or not str(val).strip():
+        return None
+    try:
+        val_clean = str(val).strip()
+        parts = val_clean.split(":")
+        if len(parts) >= 2:
+            hour = int(parts[0])
+            minute = int(parts[1])
+            second = int(parts[2]) if len(parts) > 2 else 0
+            return time(hour, minute, second)
+        return time.fromisoformat(val_clean)
+    except Exception:
+        return None
 
 
-class AssembleiaCreate(BaseModel):
-    data: date
-    titulo: str
-    descricao: Optional[str] = None
-    local: Optional[str] = None
-    hora_inicio: Optional[str] = None
-    hora_fim: Optional[str] = None
-    pautas: List[PautaCreate] = []
-    ata_conteudo: Optional[str] = None
-
-
-@router.get("", dependencies=[Depends(get_current_user)])
+@router.get("", response_model=PaginatedResponse[AssembleiaResponse], dependencies=[Depends(get_current_user)])
 async def list_assembleias(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -50,7 +58,7 @@ async def list_assembleias(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
-@router.get("/{assembleia_id}", dependencies=[Depends(get_current_user)])
+@router.get("/{assembleia_id}", response_model=AssembleiaResponse, dependencies=[Depends(get_current_user)])
 async def get_assembleia(assembleia_id: str, db: AsyncSession = Depends(get_db)):
     try:
         aid = UUID(assembleia_id) if isinstance(assembleia_id, str) else assembleia_id
@@ -68,34 +76,49 @@ async def get_assembleia(assembleia_id: str, db: AsyncSession = Depends(get_db))
     return assembleia
 
 
-@router.post("", status_code=201, dependencies=[Depends(admin_required)])
+@router.post("", response_model=AssembleiaResponse, status_code=201, dependencies=[Depends(admin_required)])
 async def create_assembleia(data: AssembleiaCreate, db: AsyncSession = Depends(get_db)):
-    a = Assembleia(data=data.data, titulo=data.titulo, descricao=data.descricao, local=data.local)
-    if data.hora_inicio:
-        a.hora_inicio = time.fromisoformat(data.hora_inicio)
-    if data.hora_fim:
-        a.hora_fim = time.fromisoformat(data.hora_fim)
-    db.add(a)
-    await db.flush()
+    try:
+        a = Assembleia(
+            data=data.data,
+            titulo=data.titulo,
+            descricao=data.descricao,
+            local=data.local,
+            hora_inicio=parse_time_safe(data.hora_inicio),
+            hora_fim=parse_time_safe(data.hora_fim),
+        )
+        db.add(a)
+        await db.flush()
 
-    for p in data.pautas:
-        db.add(Pauta(assembleia_id=a.id, ordem=p.ordem, descricao=p.descricao))
+        for p in data.pautas:
+            if p.descricao and p.descricao.strip():
+                db.add(Pauta(assembleia_id=a.id, ordem=p.ordem, descricao=p.descricao.strip()))
 
-    if data.ata_conteudo:
-        db.add(Ata(assembleia_id=a.id, conteudo=data.ata_conteudo))
+        if data.ata_conteudo and data.ata_conteudo.strip():
+            db.add(Ata(assembleia_id=a.id, conteudo=data.ata_conteudo.strip()))
 
-    await db.commit()
+        await db.commit()
 
-    r = await db.execute(
-        select(Assembleia)
-        .options(selectinload(Assembleia.pautas), selectinload(Assembleia.ata))
-        .where(Assembleia.id == a.id)
-    )
-    return r.scalar_one()
+        r = await db.execute(
+            select(Assembleia)
+            .options(selectinload(Assembleia.pautas), selectinload(Assembleia.ata))
+            .where(Assembleia.id == a.id)
+        )
+        return r.scalar_one()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Erro ao criar assembleia: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao criar assembleia: {str(e)}"
+        )
 
 
-@router.put("/{assembleia_id}", dependencies=[Depends(admin_required)])
-async def update_assembleia(assembleia_id: str, data: AssembleiaCreate, db: AsyncSession = Depends(get_db)):
+@router.put("/{assembleia_id}", response_model=AssembleiaResponse, dependencies=[Depends(admin_required)])
+async def update_assembleia(assembleia_id: str, data: AssembleiaUpdate, db: AsyncSession = Depends(get_db)):
     try:
         aid = UUID(assembleia_id) if isinstance(assembleia_id, str) else assembleia_id
     except (ValueError, TypeError):
@@ -110,32 +133,53 @@ async def update_assembleia(assembleia_id: str, data: AssembleiaCreate, db: Asyn
     if not a:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembleia não encontrada")
 
-    a.data = data.data
-    a.titulo = data.titulo
-    a.descricao = data.descricao
-    a.local = data.local
-    if data.hora_inicio:
-        a.hora_inicio = time.fromisoformat(data.hora_inicio)
-    if data.hora_fim:
-        a.hora_fim = time.fromisoformat(data.hora_fim)
+    try:
+        if data.data is not None:
+            a.data = data.data
+        if data.titulo is not None:
+            a.titulo = data.titulo
+        if data.descricao is not None:
+            a.descricao = data.descricao
+        if data.local is not None:
+            a.local = data.local
+        if data.hora_inicio is not None:
+            a.hora_inicio = parse_time_safe(data.hora_inicio)
+        if data.hora_fim is not None:
+            a.hora_fim = parse_time_safe(data.hora_fim)
 
-    if data.ata_conteudo is not None:
-        if a.ata:
-            a.ata.conteudo = data.ata_conteudo
-        elif data.ata_conteudo:
-            db.add(Ata(assembleia_id=a.id, conteudo=data.ata_conteudo))
+        if data.pautas is not None:
+            await db.execute(delete(Pauta).where(Pauta.assembleia_id == aid))
+            for p in data.pautas:
+                if p.descricao and p.descricao.strip():
+                    db.add(Pauta(assembleia_id=a.id, ordem=p.ordem, descricao=p.descricao.strip()))
 
-    await db.commit()
+        if data.ata_conteudo is not None:
+            if a.ata:
+                a.ata.conteudo = data.ata_conteudo
+            elif data.ata_conteudo.strip():
+                db.add(Ata(assembleia_id=a.id, conteudo=data.ata_conteudo.strip()))
 
-    r = await db.execute(
-        select(Assembleia)
-        .options(selectinload(Assembleia.pautas), selectinload(Assembleia.ata))
-        .where(Assembleia.id == a.id)
-    )
-    return r.scalar_one()
+        await db.commit()
+
+        r = await db.execute(
+            select(Assembleia)
+            .options(selectinload(Assembleia.pautas), selectinload(Assembleia.ata))
+            .where(Assembleia.id == a.id)
+        )
+        return r.scalar_one()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Erro ao atualizar assembleia {aid}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao atualizar assembleia: {str(e)}"
+        )
 
 
-@router.post("/{assembleia_id}/ata", status_code=200, dependencies=[Depends(admin_required)])
+@router.post("/{assembleia_id}/ata", response_model=AtaResponse, status_code=200, dependencies=[Depends(admin_required)])
 async def upload_ata_assembleia(
     assembleia_id: str,
     file: Optional[UploadFile] = File(None),
@@ -152,39 +196,47 @@ async def upload_ata_assembleia(
     if not assembleia:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembleia não encontrada")
 
-    file_path = None
-    if file and file.filename:
-        file_path = await save_upload(file, "atas")
-        # Registra no acervo de Documentos
-        doc = Documento(
-            nome=f"Ata - {assembleia.titulo} ({assembleia.data.strftime('%d/%m/%Y')})",
-            descricao=f"Ata e anexos da assembleia realizada em {assembleia.data.strftime('%d/%m/%Y')}",
-            categoria="ata",
-            caminho_arquivo=file_path,
-            tamanho_bytes=file.size,
-            tipo_mime=file.content_type,
-        )
-        db.add(doc)
+    try:
+        file_path = None
+        if file and file.filename:
+            file_path = await save_upload(file, "atas")
+            # Registra no acervo de Documentos
+            doc = Documento(
+                nome=f"Ata - {assembleia.titulo} ({assembleia.data.strftime('%d/%m/%Y')})",
+                descricao=f"Ata e anexos da assembleia realizada em {assembleia.data.strftime('%d/%m/%Y')}",
+                categoria="ata",
+                caminho_arquivo=file_path,
+                tamanho_bytes=file.size,
+                tipo_mime=file.content_type,
+            )
+            db.add(doc)
 
-    ata = assembleia.ata
-    if ata:
-        if file_path:
-            if ata.arquivo_path:
-                delete_file(ata.arquivo_path)
-            ata.arquivo_path = file_path
-        if conteudo is not None:
-            ata.conteudo = conteudo
-    else:
-        ata = Ata(
-            assembleia_id=aid,
-            conteudo=conteudo or "",
-            arquivo_path=file_path,
-        )
-        db.add(ata)
+        ata = assembleia.ata
+        if ata:
+            if file_path:
+                if ata.arquivo_path:
+                    delete_file(ata.arquivo_path)
+                ata.arquivo_path = file_path
+            if conteudo is not None:
+                ata.conteudo = conteudo
+        else:
+            ata = Ata(
+                assembleia_id=aid,
+                conteudo=conteudo or "",
+                arquivo_path=file_path,
+            )
+            db.add(ata)
 
-    await db.commit()
-    await db.refresh(ata)
-    return ata
+        await db.commit()
+        await db.refresh(ata)
+        return ata
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Erro ao salvar ata da assembleia {aid}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao salvar ata: {str(e)}"
+        )
 
 
 @router.get("/{assembleia_id}/ata/download", dependencies=[Depends(get_current_user)])
@@ -264,5 +316,6 @@ async def delete_assembleia(assembleia_id: str, db: AsyncSession = Depends(get_d
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao excluir assembleia: {str(e)}")
+
 
 
