@@ -14,5 +14,5 @@ class Assembleia(Base, BaseModelMixin):
     hora_inicio = Column(Time, nullable=True)
     hora_fim = Column(Time, nullable=True)
 
-    pautas = relationship("Pauta", back_populates="assembleia", cascade="all, delete-orphan", order_by="Pauta.ordem")
-    ata = relationship("Ata", back_populates="assembleia", uselist=False, cascade="all, delete-orphan")
+    pautas = relationship("Pauta", back_populates="assembleia", cascade="all, delete-orphan", passive_deletes=True, order_by="Pauta.ordem")
+    ata = relationship("Ata", back_populates="assembleia", uselist=False, cascade="all, delete-orphan", passive_deletes=True)
