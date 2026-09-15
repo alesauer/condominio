@@ -22,6 +22,7 @@ from app.utils.file_storage import save_upload, get_file_path, delete_file
 from datetime import time
 from typing import Optional
 from uuid import UUID
+import mimetypes
 import logging
 
 logger = logging.getLogger("condo.assembleias")
@@ -271,6 +272,65 @@ async def download_ata_assembleia(assembleia_id: str, db: AsyncSession = Depends
         filename=download_filename,
         media_type="application/octet-stream",
     )
+
+
+@router.get("/{assembleia_id}/ata/view", dependencies=[Depends(get_current_user)])
+async def view_ata_assembleia(assembleia_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        aid = UUID(assembleia_id) if isinstance(assembleia_id, str) else assembleia_id
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembleia não encontrada")
+
+    r = await db.execute(
+        select(Assembleia)
+        .options(selectinload(Assembleia.ata))
+        .where(Assembleia.id == aid)
+    )
+    assembleia = r.scalar_one_or_none()
+    if not assembleia or not assembleia.ata or not assembleia.ata.arquivo_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ata ou arquivo anexo não encontrado")
+
+    path = get_file_path(assembleia.ata.arquivo_path)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo físico não encontrado no servidor")
+
+    ext = path.suffix.lower()
+    mime_type, _ = mimetypes.guess_type(str(path))
+    if not mime_type:
+        if ext == ".pdf":
+            mime_type = "application/pdf"
+        elif ext in [".png", ".jpg", ".jpeg", ".webp"]:
+            mime_type = f"image/{ext.replace('.', '')}"
+        else:
+            mime_type = "application/octet-stream"
+
+    safe_titulo = "".join(c for c in assembleia.titulo if c.isalnum() or c in (" ", "-", "_")).strip()
+    filename = f"Ata_{assembleia.data}_{safe_titulo}{ext}"
+
+    return FileResponse(
+        path,
+        media_type=mime_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@router.delete("/{assembleia_id}/ata/file", response_model=AtaResponse, dependencies=[Depends(admin_required)])
+async def delete_ata_file(assembleia_id: str, db: AsyncSession = Depends(get_db)):
+    try:
+        aid = UUID(assembleia_id) if isinstance(assembleia_id, str) else assembleia_id
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembleia não encontrada")
+
+    r = await db.execute(select(Ata).where(Ata.assembleia_id == aid))
+    ata = r.scalar_one_or_none()
+    if not ata or not ata.arquivo_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum arquivo anexado nesta ata")
+
+    delete_file(ata.arquivo_path)
+    ata.arquivo_path = None
+    await db.commit()
+    await db.refresh(ata)
+    return ata
 
 
 @router.delete("/{assembleia_id}/ata", status_code=204, dependencies=[Depends(admin_required)])
