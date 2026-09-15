@@ -112,17 +112,18 @@ async def delete_assembleia(assembleia_id: str, db: AsyncSession = Depends(get_d
     except (ValueError, TypeError):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembleia não encontrada")
 
-    r = await db.execute(
-        select(Assembleia)
-        .options(selectinload(Assembleia.pautas), selectinload(Assembleia.ata))
-        .where(Assembleia.id == aid)
-    )
-    a = r.scalar_one_or_none()
-    if not a:
+    r = await db.execute(select(Assembleia.id).where(Assembleia.id == aid))
+    if not r.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembleia não encontrada")
 
-    # Deleta pautas e ata vinculadas para evitar violações de FK e lazyload
-    await db.execute(delete(Pauta).where(Pauta.assembleia_id == aid))
-    await db.execute(delete(Ata).where(Ata.assembleia_id == aid))
-    await db.delete(a)
-    await db.commit()
+    try:
+        # Exclui registros filhos explicitamente (pautas e atas) para evitar qualquer violação de FK
+        await db.execute(delete(Pauta).where(Pauta.assembleia_id == aid))
+        await db.execute(delete(Ata).where(Ata.assembleia_id == aid))
+        # Exclui a assembleia diretamente via SQL eliminando problemas de StaleDataError no ORM
+        await db.execute(delete(Assembleia).where(Assembleia.id == aid))
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Erro ao excluir assembleia: {str(e)}")
+
