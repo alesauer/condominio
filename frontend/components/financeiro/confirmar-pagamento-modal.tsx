@@ -99,9 +99,7 @@ export function ConfirmarPagamentoModal({
           formData.append("data_recebimento", dataPagamento);
         }
 
-        await api.post(`/${tipo}/${item.id}/comprovante`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.post(`/${tipo}/${item.id}/comprovante`, formData);
       } else {
         const payload: Record<string, any> = {
           status: "pago",

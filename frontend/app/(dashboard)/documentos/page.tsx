@@ -61,9 +61,7 @@ export default function DocumentosPage() {
     formData.append("categoria", categoria === "all" ? "outros" : categoria)
 
     try {
-      await api.post("/documentos", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      await api.post("/documentos", formData)
       qc.invalidateQueries({ queryKey: ["documentos"] })
       toast.success("Documento enviado com sucesso!")
     } catch {

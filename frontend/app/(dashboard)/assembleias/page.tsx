@@ -37,6 +37,8 @@ import {
   ChevronUp,
   Eye,
   CheckCircle2,
+  AlertCircle,
+  FileSpreadsheet,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -57,7 +59,7 @@ export default function AssembleiasPage() {
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ["assembleias", page],
-    queryFn: () => api.get(`/assembleias?page=${page}&page_size=15`).then((r) => r.data),
+    queryFn: () => api.get(`/assembleias?page=${page}&page_size=20`).then((r) => r.data),
   })
 
   const { items: sortedAssembleias, sortField, sortDirection, requestSort } = useSortableData(
@@ -77,7 +79,7 @@ export default function AssembleiasPage() {
       qc.invalidateQueries({ queryKey: ["assembleias"] })
       toast.success("Assembleia excluída com sucesso!")
     } catch {
-      toast.error("Erro ao excluir assembleia")
+      toast.error("Erro ao excluir assembleia.")
     }
   }
 
@@ -132,7 +134,7 @@ export default function AssembleiasPage() {
       await api.post(`/assembleias/${attachAtaAssembleia.id}/ata`, formData)
 
       qc.invalidateQueries({ queryKey: ["assembleias"] })
-      toast.success("Ata atualizada com sucesso!")
+      toast.success("Ata salva com sucesso!")
       setAttachAtaAssembleia(null)
     } catch (err: any) {
       const msg = err?.response?.data?.detail || "Erro ao atualizar ata da assembleia."
@@ -142,8 +144,19 @@ export default function AssembleiasPage() {
     }
   }
 
+  const getFileName = (path?: string) => {
+    if (!path) return "Documento Anexo"
+    const name = path.split("/").pop() || path
+    return name
+  }
+
+  const isPastDate = (dateStr: string) => {
+    const today = new Date().toISOString().split("T")[0]
+    return dateStr <= today
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -151,7 +164,7 @@ export default function AssembleiasPage() {
             Assembleias e Reuniões
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Pautas, convocações, atas digitalizadas e arquivos de decisões coletivas
+            Pautas de discussão, convocações, arquivos de atas digitalizadas e decisões coletivas
           </p>
         </div>
         <Link href="/assembleias/nova">
@@ -211,9 +224,9 @@ export default function AssembleiasPage() {
 
       {/* Assembleias List */}
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-32 w-full rounded-xl" />
+            <Skeleton key={i} className="h-44 w-full rounded-2xl" />
           ))}
         </div>
       ) : (
@@ -223,47 +236,72 @@ export default function AssembleiasPage() {
             const hasAtaText = Boolean(a.ata?.conteudo && a.ata.conteudo.trim().length > 0)
             const hasPautas = a.pautas && a.pautas.length > 0
             const isPautasExpanded = expandedPautas[a.id]
+            const past = isPastDate(a.data)
 
             return (
               <Card
                 key={a.id}
-                className="border border-slate-200/80 bg-white shadow-card hover:border-slate-300 transition-all"
+                className="border border-slate-200/90 bg-white shadow-card hover:border-slate-300 transition-all overflow-hidden rounded-2xl"
               >
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-3 bg-slate-50/40 border-b border-slate-100">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2.5 rounded-xl bg-primary-50 text-primary-600 shrink-0 mt-0.5">
+                    <div className="flex items-start gap-3.5">
+                      <div
+                        className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+                          past
+                            ? "bg-slate-100 text-slate-600"
+                            : "bg-primary-100 text-primary-700 font-semibold"
+                        }`}
+                      >
                         <CalendarDays className="h-5 w-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-base font-semibold text-slate-900 leading-snug">
-                          {a.titulo}
-                        </CardTitle>
-                        <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 mt-1.5 font-medium">
-                          <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md border border-slate-200">
-                            {formatDate(a.data)}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <CardTitle className="text-base font-bold text-slate-900 leading-snug">
+                            {a.titulo}
+                          </CardTitle>
+                          <span
+                            className={`px-2 py-0.5 text-[11px] font-semibold rounded-full uppercase tracking-wider ${
+                              past
+                                ? "bg-slate-100 text-slate-600 border border-slate-200"
+                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                            }`}
+                          >
+                            {past ? "Realizada" : "Agendada / Convocada"}
                           </span>
+                        </div>
+
+                        {/* Metadados: Data, Horário e Local */}
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-2 font-medium">
+                          <span className="flex items-center gap-1.5 bg-white text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
+                            <CalendarDays className="h-3.5 w-3.5 text-primary-500" />
+                            <span>{formatDate(a.data)}</span>
+                          </span>
+
                           {(a.hora_inicio || a.hora_fim) && (
-                            <span className="flex items-center gap-1 text-slate-500">
+                            <span className="flex items-center gap-1.5 bg-white text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
                               <Clock className="h-3.5 w-3.5 text-slate-400" />
-                              {a.hora_inicio && a.hora_fim
-                                ? `${a.hora_inicio.slice(0, 5)} às ${a.hora_fim.slice(0, 5)}`
-                                : a.hora_inicio
-                                ? `A partir das ${a.hora_inicio.slice(0, 5)}`
-                                : `Até ${a.hora_fim.slice(0, 5)}`}
+                              <span>
+                                {a.hora_inicio && a.hora_fim
+                                  ? `${a.hora_inicio.slice(0, 5)} às ${a.hora_fim.slice(0, 5)}`
+                                  : a.hora_inicio
+                                  ? `Início: ${a.hora_inicio.slice(0, 5)}`
+                                  : `Término: ${a.hora_fim.slice(0, 5)}`}
+                              </span>
                             </span>
                           )}
+
                           {a.local && (
-                            <span className="flex items-center gap-1 text-slate-500">
+                            <span className="flex items-center gap-1.5 bg-white text-slate-700 px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
                               <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                              {a.local}
+                              <span>{a.local}</span>
                             </span>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-start">
+                    <div className="flex items-center gap-1.5 self-end sm:self-start">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -277,41 +315,47 @@ export default function AssembleiasPage() {
                   </div>
                 </CardHeader>
 
-                <CardContent className="pt-0 space-y-3.5">
-                  {/* Descrição */}
+                <CardContent className="pt-4 space-y-4">
+                  {/* Descrição / Convocação */}
                   {a.descricao && (
-                    <p className="text-sm text-slate-600 leading-relaxed pl-1">
-                      {a.descricao}
-                    </p>
+                    <div className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        Convocação / Descrição Geral
+                      </p>
+                      <p>{a.descricao}</p>
+                    </div>
                   )}
 
-                  {/* Pautas Toggle */}
+                  {/* Pautas da Reunião */}
                   {hasPautas && (
-                    <div className="rounded-lg border border-slate-100 bg-slate-50/60 overflow-hidden">
+                    <div className="rounded-xl border border-slate-200/70 bg-white overflow-hidden">
                       <button
                         type="button"
                         onClick={() => togglePautas(a.id)}
-                        className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100/80 transition-colors"
+                        className="w-full flex items-center justify-between px-3.5 py-2 text-xs font-semibold text-slate-800 hover:bg-slate-50 transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <FileText className="h-3.5 w-3.5 text-slate-500" />
-                          <span>Pautas da Reunião ({a.pautas.length})</span>
+                          <FileSpreadsheet className="h-4 w-4 text-primary-600" />
+                          <span>Pautas da Assembleia ({a.pautas.length})</span>
                         </div>
-                        {isPautasExpanded ? (
-                          <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                        )}
+                        <div className="flex items-center gap-1 text-slate-400 text-xs font-normal">
+                          <span>{isPautasExpanded ? "Ocultar" : "Ver pautas"}</span>
+                          {isPautasExpanded ? (
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          )}
+                        </div>
                       </button>
 
                       {isPautasExpanded && (
-                        <div className="px-3 pb-3 pt-1 space-y-1.5 border-t border-slate-100">
+                        <div className="px-3.5 pb-3 pt-1 space-y-2 border-t border-slate-100 bg-slate-50/30">
                           {a.pautas.map((p: any) => (
-                            <div key={p.id} className="flex items-start gap-2 text-xs text-slate-600">
-                              <span className="font-semibold text-slate-400 shrink-0">
-                                {p.ordem}º
+                            <div key={p.id} className="flex items-start gap-2.5 text-xs text-slate-700">
+                              <span className="flex items-center justify-center h-5 w-5 rounded bg-primary-50 text-primary-700 font-bold text-[10px] shrink-0 mt-0.5">
+                                {p.ordem}
                               </span>
-                              <span>{p.descricao}</span>
+                              <span className="leading-relaxed">{p.descricao}</span>
                             </div>
                           ))}
                         </div>
@@ -319,67 +363,110 @@ export default function AssembleiasPage() {
                     </div>
                   )}
 
-                  {/* Ata Status and Action Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {hasAtaFile ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                          <FileCheck className="h-3.5 w-3.5 text-emerald-600" />
-                          <span>Ata Anexada</span>
-                        </span>
-                      ) : hasAtaText ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/80">
-                          <FileText className="h-3.5 w-3.5 text-blue-600" />
-                          <span>Texto Registrado</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-50 text-slate-500 border border-slate-200">
-                          <Paperclip className="h-3.5 w-3.5 text-slate-400" />
-                          <span>Sem ata anexada</span>
-                        </span>
-                      )}
+                  {/* Ata e Anexos Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                        <span>Ata e Documentos Anexos</span>
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {hasAtaFile && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 shadow-2xs"
-                          onClick={() => handleDownloadAta(a)}
-                          disabled={downloadingId === a.id}
-                        >
-                          {downloadingId === a.id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Download className="h-3.5 w-3.5 text-emerald-600" />
-                          )}
-                          <span>Baixar Ata</span>
-                        </Button>
-                      )}
+                    {hasAtaFile || hasAtaText ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {/* Arquivo Anexo Card */}
+                        {hasAtaFile && (
+                          <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70 transition-colors">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                                <FileCheck className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-900 truncate">
+                                  {getFileName(a.ata?.arquivo_path)}
+                                </p>
+                                <p className="text-[11px] text-emerald-700 font-medium">
+                                  Documento Oficial Anexado
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs text-emerald-700 border-emerald-300 bg-white hover:bg-emerald-100 shrink-0 ml-2"
+                              onClick={() => handleDownloadAta(a)}
+                              disabled={downloadingId === a.id}
+                              title="Baixar ata da assembleia"
+                            >
+                              {downloadingId === a.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5 text-emerald-600" />
+                              )}
+                              <span>Baixar</span>
+                            </Button>
+                          </div>
+                        )}
 
-                      {hasAtaText && (
+                        {/* Texto / Resumo Card */}
+                        {hasAtaText && (
+                          <div className="flex items-center justify-between p-3 rounded-xl border border-blue-200 bg-blue-50/40 hover:bg-blue-50/70 transition-colors">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="p-2 rounded-lg bg-blue-100 text-blue-700 shrink-0">
+                                <FileText className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-900 truncate">
+                                  {a.ata?.conteudo.slice(0, 45)}...
+                                </p>
+                                <p className="text-[11px] text-blue-700 font-medium">
+                                  Resumo / Texto Registrado
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs text-blue-700 border-blue-300 bg-white hover:bg-blue-100 shrink-0 ml-2"
+                              onClick={() => setViewAtaAssembleia(a)}
+                              title="Visualizar texto da ata"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-blue-600" />
+                              <span>Ver</span>
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                          <span>Nenhuma ata ou documento foi anexado para esta assembleia ainda.</span>
+                        </div>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          className="h-8 gap-1.5 text-xs text-slate-700 border-slate-200 hover:bg-slate-50 shadow-2xs"
-                          onClick={() => setViewAtaAssembleia(a)}
+                          className="h-7 text-xs text-primary-600 hover:bg-primary-50 font-semibold gap-1"
+                          onClick={() => openAttachModal(a)}
                         >
-                          <Eye className="h-3.5 w-3.5 text-slate-500" />
-                          <span>Ver Resumo</span>
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Anexar Agora</span>
                         </Button>
-                      )}
+                      </div>
+                    )}
+                  </div>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs text-primary-600 hover:bg-primary-50"
-                        onClick={() => openAttachModal(a)}
-                      >
-                        <Paperclip className="h-3.5 w-3.5" />
-                        <span>{hasAtaFile || hasAtaText ? "Atualizar Ata" : "Anexar Ata"}</span>
-                      </Button>
-                    </div>
+                  {/* Actions Bar */}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 gap-1.5 text-xs text-slate-600 hover:bg-slate-100"
+                      onClick={() => openAttachModal(a)}
+                    >
+                      <Paperclip className="h-3.5 w-3.5 text-slate-500" />
+                      <span>{hasAtaFile || hasAtaText ? "Gerenciar / Trocar Ata" : "Anexar Ata"}</span>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -387,11 +474,11 @@ export default function AssembleiasPage() {
           })}
 
           {sortedAssembleias.length === 0 && (
-            <div className="py-14 text-center text-sm text-slate-400 bg-white rounded-xl border border-slate-200/80 shadow-card">
+            <div className="py-14 text-center text-sm text-slate-400 bg-white rounded-2xl border border-slate-200/80 shadow-card">
               <CalendarDays className="h-10 w-10 text-slate-300 mx-auto mb-2" />
               <p className="font-semibold text-slate-600">Nenhuma assembleia registrada</p>
               <p className="text-xs text-slate-400 mt-0.5">
-                Clique no botão "Nova Assembleia" para cadastrar reuniões e pautas.
+                Clique no botão "Nova Assembleia" para cadastrar reuniões, pautas e atas.
               </p>
             </div>
           )}
@@ -400,34 +487,54 @@ export default function AssembleiasPage() {
 
       {/* Modal: Visualizar Resumo da Ata */}
       <Dialog open={!!viewAtaAssembleia} onOpenChange={(open) => !open && setViewAtaAssembleia(null)}>
-        <DialogContent className="max-w-lg bg-white">
-          <DialogHeader>
+        <DialogContent className="max-w-xl bg-white rounded-2xl">
+          <DialogHeader className="pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2 text-primary-600">
               <FileText className="h-5 w-5" />
-              <DialogTitle className="text-base font-semibold text-slate-900">
-                Texto / Resumo da Ata
+              <DialogTitle className="text-base font-bold text-slate-900">
+                Texto e Detalhes da Ata
               </DialogTitle>
             </div>
-            <DialogDescription>
-              {viewAtaAssembleia?.titulo} • {viewAtaAssembleia && formatDate(viewAtaAssembleia.data)}
+            <DialogDescription className="text-xs text-slate-500 mt-1">
+              {viewAtaAssembleia?.titulo} • Realizada em {viewAtaAssembleia && formatDate(viewAtaAssembleia.data)}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="my-2 p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto">
-            {viewAtaAssembleia?.ata?.conteudo || "Nenhum texto registrado."}
+          <div className="space-y-4 py-2">
+            {/* Informações gerais */}
+            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600">
+              <div>
+                <span className="font-semibold text-slate-800">Data: </span>
+                {viewAtaAssembleia && formatDate(viewAtaAssembleia.data)}
+              </div>
+              <div>
+                <span className="font-semibold text-slate-800">Local: </span>
+                {viewAtaAssembleia?.local || "Não informado"}
+              </div>
+            </div>
+
+            {/* Texto da Ata */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Conteúdo / Resumo Registrado
+              </Label>
+              <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
+                {viewAtaAssembleia?.ata?.conteudo || "Nenhum texto registrado."}
+              </div>
+            </div>
           </div>
 
-          <DialogFooter className="flex items-center justify-between sm:justify-between w-full">
+          <DialogFooter className="flex items-center justify-between sm:justify-between w-full pt-3 border-t border-slate-100">
             {viewAtaAssembleia?.ata?.arquivo_path ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                className="gap-1.5 text-xs text-emerald-700 border-emerald-300 bg-emerald-50 hover:bg-emerald-100"
                 onClick={() => handleDownloadAta(viewAtaAssembleia)}
               >
                 <Download className="h-3.5 w-3.5" />
-                <span>Baixar Arquivo Completo</span>
+                <span>Baixar Documento Completo</span>
               </Button>
             ) : <div />}
             <Button
@@ -444,16 +551,16 @@ export default function AssembleiasPage() {
 
       {/* Modal: Anexar / Atualizar Ata */}
       <Dialog open={!!attachAtaAssembleia} onOpenChange={(open) => !open && setAttachAtaAssembleia(null)}>
-        <DialogContent className="max-w-lg bg-white">
+        <DialogContent className="max-w-lg bg-white rounded-2xl">
           <form onSubmit={handleSaveAtaModal}>
             <DialogHeader className="pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2 text-primary-600">
                 <Paperclip className="h-5 w-5" />
-                <DialogTitle className="text-base font-semibold text-slate-900">
+                <DialogTitle className="text-base font-bold text-slate-900">
                   {attachAtaAssembleia?.ata?.arquivo_path ? "Atualizar Ata e Anexos" : "Anexar Ata da Assembleia"}
                 </DialogTitle>
               </div>
-              <DialogDescription>
+              <DialogDescription className="text-xs text-slate-500 mt-1">
                 {attachAtaAssembleia?.titulo} ({attachAtaAssembleia && formatDate(attachAtaAssembleia.data)})
               </DialogDescription>
             </DialogHeader>
@@ -461,7 +568,7 @@ export default function AssembleiasPage() {
             <div className="py-4 space-y-4">
               {/* File upload dropzone */}
               <div className="space-y-2">
-                <Label className="text-slate-700 font-medium text-xs">Arquivo Digitalizado (PDF, DOCX, Imagem)</Label>
+                <Label className="text-slate-700 font-semibold text-xs">Arquivo Digitalizado (PDF, DOCX, Imagem)</Label>
                 {!modalFile ? (
                   <div
                     onDragOver={(e) => {
@@ -500,7 +607,7 @@ export default function AssembleiasPage() {
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
                       {attachAtaAssembleia?.ata?.arquivo_path
-                        ? "O novo arquivo substituirá o anexo atual."
+                        ? "O novo arquivo substituirá o documento atual."
                         : "PDF, Word ou Imagem até 20MB"}
                     </p>
                   </div>
@@ -530,7 +637,7 @@ export default function AssembleiasPage() {
 
               {/* Texto / Resumo da Ata */}
               <div className="space-y-2">
-                <Label htmlFor="modal_conteudo" className="text-slate-700 font-medium text-xs">
+                <Label htmlFor="modal_conteudo" className="text-slate-700 font-semibold text-xs">
                   Texto / Resumo da Ata <span className="text-slate-400 font-normal">(Opcional)</span>
                 </Label>
                 <textarea
@@ -574,4 +681,3 @@ export default function AssembleiasPage() {
     </div>
   )
 }
-
