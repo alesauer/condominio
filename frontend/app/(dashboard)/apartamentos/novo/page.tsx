@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
+import { AdminGate, RestrictedPageNotice } from "@/components/auth/admin-gate";
 
 export default function NovoApartamentoPage() {
   const router = useRouter();
@@ -51,8 +52,9 @@ export default function NovoApartamentoPage() {
   };
 
   return (
-    <div className="max-w-xl space-y-4">
-      <div className="flex items-center gap-2">
+    <AdminGate fallback={<RestrictedPageNotice backHref="/apartamentos" backLabel="Voltar para Apartamentos" />}>
+      <div className="max-w-xl space-y-4">
+        <div className="flex items-center gap-2">
         <Link href="/apartamentos">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
@@ -220,5 +222,6 @@ export default function NovoApartamentoPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminGate>
   );
 }

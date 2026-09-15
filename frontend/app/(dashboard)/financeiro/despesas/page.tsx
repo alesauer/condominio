@@ -54,9 +54,13 @@ const MESES = [
   { value: "12", label: "Dezembro" },
 ]
 
-const ANOS = ["2024", "2025", "2026", "2027"]
+const ANOS = ["2024", "2025", "2026", "2027", "2028"]
+
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 export default function DespesasPage() {
+  const { isAdmin } = useAuth()
   const currentDate = new Date()
   const [selectedMes, setSelectedMes] = useState<string>(String(currentDate.getMonth() + 1))
   const [selectedAno, setSelectedAno] = useState<string>(String(currentDate.getFullYear()))
@@ -248,6 +252,8 @@ export default function DespesasPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -258,29 +264,31 @@ export default function DespesasPage() {
             Lançamentos, rateios ordinários e extraordinários, e quitação de contas
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setDuplicarModalOpen(true)}
-            disabled={selectedMes === "all"}
-            className="gap-2"
-            title={
-              selectedMes === "all"
-                ? "Selecione um mês específico para duplicar"
-                : `Duplicar despesas de ${currentMonthLabel} para o mês posterior`
-            }
-          >
-            <Copy className="h-4 w-4 text-slate-600" />
-            <span>Duplicar Mês</span>
-          </Button>
-          <Link href="/financeiro/despesas/nova">
-            <Button size="sm" className="gap-2 shadow-xs">
-              <Plus className="h-4 w-4" />
-              <span>Nova Despesa</span>
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDuplicarModalOpen(true)}
+              disabled={selectedMes === "all"}
+              className="gap-2"
+              title={
+                selectedMes === "all"
+                  ? "Selecione um mês específico para duplicar"
+                  : `Duplicar despesas de ${currentMonthLabel} para o mês posterior`
+              }
+            >
+              <Copy className="h-4 w-4 text-slate-600" />
+              <span>Duplicar Mês</span>
             </Button>
-          </Link>
-        </div>
+            <Link href="/financeiro/despesas/nova">
+              <Button size="sm" className="gap-2 shadow-xs">
+                <Plus className="h-4 w-4" />
+                <span>Nova Despesa</span>
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Month Stepper & Filter Toolbar */}
@@ -480,12 +488,27 @@ export default function DespesasPage() {
                     <td className="px-4 py-3.5 text-slate-600">{formatDate(d.competencia)}</td>
                     <td className="px-4 py-3.5 text-slate-600">{d.vencimento ? formatDate(d.vencimento) : "—"}</td>
                     <td className="px-4 py-3.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(d)}
-                        title={`Clique para alterar status de ${d.status}`}
-                        className="focus:outline-none cursor-pointer"
-                      >
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(d)}
+                          title={`Clique para alterar status de ${d.status}`}
+                          className="focus:outline-none cursor-pointer"
+                        >
+                          <span
+                            className={`status-pill ${
+                              d.status === "pago"
+                                ? "status-pill-pago"
+                                : d.status === "atrasado"
+                                ? "status-pill-atrasado"
+                                : "status-pill-pendente"
+                            }`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            <span>{statusLabel[d.status] || d.status}</span>
+                          </span>
+                        </button>
+                      ) : (
                         <span
                           className={`status-pill ${
                             d.status === "pago"
@@ -498,7 +521,7 @@ export default function DespesasPage() {
                           <span className="h-1.5 w-1.5 rounded-full bg-current" />
                           <span>{statusLabel[d.status] || d.status}</span>
                         </span>
-                      </button>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -513,24 +536,28 @@ export default function DespesasPage() {
                             <Download className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditModal(d)}
-                          title="Editar despesa"
-                          className="h-8 w-8 text-slate-500 hover:text-slate-900"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(d.id)}
-                          title="Excluir despesa"
-                          className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditModal(d)}
+                              title="Editar despesa"
+                              className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(d.id)}
+                              title="Excluir despesa"
+                              className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

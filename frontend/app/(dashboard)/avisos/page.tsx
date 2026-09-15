@@ -48,6 +48,8 @@ import {
   Megaphone,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 const getPrioridadeBadgeStyle = (prioridade: string) => {
   switch (prioridade?.toLowerCase()) {
@@ -64,6 +66,7 @@ const getPrioridadeBadgeStyle = (prioridade: string) => {
 }
 
 export default function AvisosPage() {
+  const { isAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
@@ -228,6 +231,8 @@ export default function AvisosPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -254,13 +259,15 @@ export default function AvisosPage() {
             <span>Atualizar</span>
           </Button>
 
-          <Button
-            onClick={() => setCreateModalOpen(true)}
-            className="h-9 gap-2 shadow-xs bg-primary-600 hover:bg-primary-700"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Novo Aviso</span>
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={() => setCreateModalOpen(true)}
+              className="h-9 gap-2 shadow-xs bg-primary-600 hover:bg-primary-700"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Novo Aviso</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -470,25 +477,29 @@ export default function AvisosPage() {
                         <span>Ver</span>
                       </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                        onClick={() => openEditModal(a)}
-                        title="Editar comunicado"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                            onClick={() => openEditModal(a)}
+                            title="Editar comunicado"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => handleDelete(a.id)}
-                        title="Excluir comunicado"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => handleDelete(a.id)}
+                            title="Excluir comunicado"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

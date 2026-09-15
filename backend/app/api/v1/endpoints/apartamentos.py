@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.schemas.apartamento import ApartamentoCreate, ApartamentoUpdate, ApartamentoResponse, ApartamentoListResponse
 from app.schemas.common import PaginatedResponse
 from app.services import apartamento_service
@@ -14,7 +15,7 @@ from app.models.apartamento_morador import ApartamentoMorador
 router = APIRouter()
 
 
-@router.get("", response_model=PaginatedResponse[ApartamentoListResponse])
+@router.get("", response_model=PaginatedResponse[ApartamentoListResponse], dependencies=[Depends(get_current_user)])
 async def list_apartamentos(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -29,7 +30,7 @@ async def list_apartamentos(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
-@router.get("/{apartamento_id}", response_model=ApartamentoResponse)
+@router.get("/{apartamento_id}", response_model=ApartamentoResponse, dependencies=[Depends(get_current_user)])
 async def get_apartamento(apartamento_id: str, db: AsyncSession = Depends(get_db)):
     return await apartamento_service.get_apartamento(db, apartamento_id)
 
@@ -49,7 +50,7 @@ async def delete_apartamento(apartamento_id: str, db: AsyncSession = Depends(get
     await apartamento_service.delete_apartamento(db, apartamento_id)
 
 
-@router.get("/{apartamento_id}/moradores")
+@router.get("/{apartamento_id}/moradores", dependencies=[Depends(get_current_user)])
 async def list_moradores_apartamento(apartamento_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(ApartamentoMorador)

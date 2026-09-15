@@ -21,9 +21,22 @@ import {
   ChevronRight,
   ShieldCheck,
 } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 
-const menuGroups = [
+interface MenuItem {
+  href: string
+  label: string
+  icon: any
+  adminOnly?: boolean
+}
+
+interface MenuGroup {
+  title: string
+  items: MenuItem[]
+}
+
+const menuGroups: MenuGroup[] = [
   {
     title: "Principal",
     items: [
@@ -64,7 +77,7 @@ const menuGroups = [
     items: [
       { href: "/inadimplencia", label: "Inadimplência", icon: CircleAlert },
       { href: "/relatorios", label: "Relatórios", icon: ChartNoAxesCombined },
-      { href: "/auditoria", label: "Auditoria", icon: History },
+      { href: "/auditoria", label: "Auditoria", icon: History, adminOnly: true },
     ],
   },
 ]
@@ -76,6 +89,14 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
+  const { isAdmin } = useAuth()
+
+  const visibleGroups = menuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+    }))
+    .filter((group) => group.items.length > 0)
 
   return (
     <aside
@@ -126,7 +147,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-5 scrollbar-thin">
-        {menuGroups.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.title} className="space-y-1">
             {!collapsed && (
               <div className="px-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">

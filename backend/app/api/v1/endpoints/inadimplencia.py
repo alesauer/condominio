@@ -45,7 +45,7 @@ async def update_config(data: ConfigUpdate, db: AsyncSession = Depends(get_db)):
     return {"percentual_multa": float(config.percentual_multa), "percentual_juros_mes": float(config.percentual_juros_mes), "dias_tolerancia": config.dias_tolerancia}
 
 
-@router.get("/cobrancas-atrasadas", dependencies=[Depends(admin_required)])
+@router.get("/cobrancas-atrasadas", dependencies=[Depends(get_current_user)])
 async def cobrancas_atrasadas(db: AsyncSession = Depends(get_db)):
     r = await db.execute(select(Cobranca).where(Cobranca.status.in_(["pendente", "atrasado"]), Cobranca.vencimento < date.today()))
     return r.scalars().all()

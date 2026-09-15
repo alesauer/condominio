@@ -55,9 +55,13 @@ const MESES = [
   { value: "12", label: "Dezembro" },
 ]
 
-const ANOS = ["2024", "2025", "2026", "2027"]
+const ANOS = ["2024", "2025", "2026", "2027", "2028"]
+
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 export default function ReceitasPage() {
+  const { isAdmin } = useAuth()
   const currentDate = new Date()
   const [selectedMes, setSelectedMes] = useState<string>(String(currentDate.getMonth() + 1))
   const [selectedAno, setSelectedAno] = useState<string>(String(currentDate.getFullYear()))
@@ -271,6 +275,8 @@ export default function ReceitasPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -281,39 +287,41 @@ export default function ReceitasPage() {
             Previsão orçamentária, rateios arrecadados e confirmação de recebimentos
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleSincronizar}
-            disabled={sincronizarMut.isPending || selectedMes === "all"}
-            className="gap-2 text-emerald-700 hover:text-emerald-800"
-            title={
-              selectedMes === "all"
-                ? "Selecione um mês específico para sincronizar as receitas"
-                : `Sincronizar receitas com base nas despesas de ${currentMonthLabel}`
-            }
-          >
-            <RefreshCw className={`h-4 w-4 ${sincronizarMut.isPending ? "animate-spin text-emerald-600" : "text-emerald-600"}`} />
-            <span>{sincronizarMut.isPending ? "Sincronizando..." : "Sincronizar com Despesas"}</span>
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setDuplicarModalOpen(true)}
-            disabled={selectedMes === "all"}
-            className="gap-2"
-          >
-            <Copy className="h-4 w-4 text-slate-600" />
-            <span>Duplicar Mês</span>
-          </Button>
-          <Link href="/financeiro/receitas/nova">
-            <Button size="sm" className="gap-2 shadow-xs">
-              <Plus className="h-4 w-4" />
-              <span>Nova Receita</span>
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleSincronizar}
+              disabled={sincronizarMut.isPending || selectedMes === "all"}
+              className="gap-2 text-emerald-700 hover:text-emerald-800"
+              title={
+                selectedMes === "all"
+                  ? "Selecione um mês específico para sincronizar as receitas"
+                  : `Sincronizar receitas com base nas despesas de ${currentMonthLabel}`
+              }
+            >
+              <RefreshCw className={`h-4 w-4 ${sincronizarMut.isPending ? "animate-spin text-emerald-600" : "text-emerald-600"}`} />
+              <span>{sincronizarMut.isPending ? "Sincronizando..." : "Sincronizar com Despesas"}</span>
             </Button>
-          </Link>
-        </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setDuplicarModalOpen(true)}
+              disabled={selectedMes === "all"}
+              className="gap-2"
+            >
+              <Copy className="h-4 w-4 text-slate-600" />
+              <span>Duplicar Mês</span>
+            </Button>
+            <Link href="/financeiro/receitas/nova">
+              <Button size="sm" className="gap-2 shadow-xs">
+                <Plus className="h-4 w-4" />
+                <span>Nova Receita</span>
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Month Stepper & Filter Toolbar */}
@@ -515,12 +523,27 @@ export default function ReceitasPage() {
                     <td className="px-4 py-3.5 font-bold text-slate-900">{formatCurrency(r.valor)}</td>
                     <td className="px-4 py-3.5 text-slate-600">{formatDate(r.competencia)}</td>
                     <td className="px-4 py-3.5">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(r)}
-                        title={`Clique para alternar status de ${r.status}`}
-                        className="focus:outline-none cursor-pointer"
-                      >
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(r)}
+                          title={`Clique para alternar status de ${r.status}`}
+                          className="focus:outline-none cursor-pointer"
+                        >
+                          <span
+                            className={`status-pill ${
+                              r.status === "pago"
+                                ? "status-pill-pago"
+                                : r.status === "atrasado"
+                                ? "status-pill-atrasado"
+                                : "status-pill-pendente"
+                            }`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            <span>{statusLabel[r.status] || r.status}</span>
+                          </span>
+                        </button>
+                      ) : (
                         <span
                           className={`status-pill ${
                             r.status === "pago"
@@ -533,7 +556,7 @@ export default function ReceitasPage() {
                           <span className="h-1.5 w-1.5 rounded-full bg-current" />
                           <span>{statusLabel[r.status] || r.status}</span>
                         </span>
-                      </button>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -548,24 +571,28 @@ export default function ReceitasPage() {
                             <Download className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditModal(r)}
-                          title="Editar receita"
-                          className="h-8 w-8 text-slate-500 hover:text-slate-900"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(r.id)}
-                          title="Excluir receita"
-                          className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditModal(r)}
+                              title="Editar receita"
+                              className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(r.id)}
+                              title="Excluir receita"
+                              className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -575,7 +602,7 @@ export default function ReceitasPage() {
                     <td colSpan={6} className="py-10 text-center text-sm text-slate-400">
                       <p className="font-semibold text-slate-700">Nenhuma receita encontrada para {currentMonthLabel}.</p>
                       <p className="text-xs text-slate-500 mt-1">A receita do condomínio provém do rateio das despesas + gás + fundo de reserva.</p>
-                      {selectedMes !== "all" && (
+                      {isAdmin && selectedMes !== "all" && (
                         <div className="mt-4 flex items-center justify-center gap-2">
                           <Button
                             variant="secondary"

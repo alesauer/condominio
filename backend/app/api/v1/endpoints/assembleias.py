@@ -206,7 +206,7 @@ async def upload_ata_assembleia(
                 doc = Documento(
                     nome=f"Ata - {assembleia.titulo} ({assembleia.data.strftime('%d/%m/%Y')})",
                     descricao=f"Ata e anexos da assembleia realizada em {assembleia.data.strftime('%d/%m/%Y')}",
-                    categoria="atas",
+                    categoria="ata",
                     caminho_arquivo=file_path,
                     tamanho_bytes=file.size or 0,
                     tipo_mime=file.content_type,

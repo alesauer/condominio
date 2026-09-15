@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.schemas.leitura_gas import (
     LeituraGasCreate,
     LeituraGasSalvarLotePayload,
@@ -16,7 +17,7 @@ from app.utils.pagination import paginate
 router = APIRouter()
 
 
-@router.get("/planilha", response_model=LeituraGasPlanilhaResponse, dependencies=[Depends(admin_required)])
+@router.get("/planilha", response_model=LeituraGasPlanilhaResponse, dependencies=[Depends(get_current_user)])
 async def obter_planilha_gas(
     competencia: date = Query(..., description="Mês de competência (ex: 2026-09-01)"),
     db: AsyncSession = Depends(get_db),
@@ -33,7 +34,7 @@ async def salvar_lote(
     return await leitura_gas_service.salvar_leituras_lote(db, data.model_dump(), usuario=current_user)
 
 
-@router.get("", response_model=PaginatedResponse[LeituraGasResponse], dependencies=[Depends(admin_required)])
+@router.get("", response_model=PaginatedResponse[LeituraGasResponse], dependencies=[Depends(get_current_user)])
 async def list_leituras(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -45,7 +46,7 @@ async def list_leituras(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
-@router.get("/{leitura_id}", response_model=LeituraGasResponse, dependencies=[Depends(admin_required)])
+@router.get("/{leitura_id}", response_model=LeituraGasResponse, dependencies=[Depends(get_current_user)])
 async def get_leitura(leitura_id: str, db: AsyncSession = Depends(get_db)):
     return await leitura_gas_service.get_leitura(db, leitura_id)
 

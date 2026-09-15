@@ -48,6 +48,8 @@ import {
   Layers,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 interface PautaItem {
   id?: string
@@ -56,6 +58,7 @@ interface PautaItem {
 }
 
 export default function AssembleiasPage() {
+  const { isAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "realizadas" | "agendadas" | "com_anexo" | "sem_anexo">("all")
@@ -354,6 +357,8 @@ export default function AssembleiasPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -367,12 +372,14 @@ export default function AssembleiasPage() {
             Histórico completo de reuniões, convocações, pautas debatidas, atas digitalizadas e deliberações oficiais
           </p>
         </div>
-        <Link href="/assembleias/nova">
-          <Button className="gap-2 shadow-xs bg-primary-600 hover:bg-primary-700">
-            <Plus className="h-4 w-4" />
-            <span>Nova Assembleia</span>
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/assembleias/nova">
+            <Button className="gap-2 shadow-xs bg-primary-600 hover:bg-primary-700">
+              <Plus className="h-4 w-4" />
+              <span>Nova Assembleia</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* KPI Stats Cards */}
@@ -609,25 +616,29 @@ export default function AssembleiasPage() {
                         <span className="hidden md:inline">Ver Ata</span>
                       </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                        onClick={() => openEditModal(a)}
-                        title="Editar assembleia e pautas"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                            onClick={() => openEditModal(a)}
+                            title="Editar assembleia e pautas"
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => handleDelete(a.id)}
-                        title="Excluir assembleia"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={() => handleDelete(a.id)}
+                            title="Excluir assembleia"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -751,28 +762,32 @@ export default function AssembleiasPage() {
                               </Button>
 
                               {/* Delete Attachment Button */}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                onClick={() => handleDeleteAtaFile(a)}
-                                title="Excluir apenas o arquivo anexo"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              {isAdmin && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                  onClick={() => handleDeleteAtaFile(a)}
+                                  title="Excluir apenas o arquivo anexo"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                         ) : (
                           <div className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-xs text-slate-500">
                             <span className="text-slate-400">Nenhum arquivo digitalizado anexado.</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs text-primary-600 hover:bg-primary-50 font-medium"
-                              onClick={() => openAttachModal(a)}
-                            >
-                              + Anexar Arquivo
-                            </Button>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-primary-600 hover:bg-primary-50 font-medium"
+                                onClick={() => openAttachModal(a)}
+                              >
+                                + Anexar Arquivo
+                              </Button>
+                            )}
                           </div>
                         )}
 

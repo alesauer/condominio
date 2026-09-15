@@ -19,6 +19,8 @@ import { useSortableData } from "@/hooks/use-sortable-data"
 import { Plus, Search, Pencil, Trash2, Building2, UserCheck, Shield } from "lucide-react"
 import { toast } from "sonner"
 import type { Apartamento } from "@/types/apartamento"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 const tipoLabel: Record<string, string> = {
   padrao: "Padrão",
@@ -33,6 +35,7 @@ const statusLabel: Record<string, string> = {
 }
 
 export default function ApartamentosPage() {
+  const { isAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [tipoFilter, setTipoFilter] = useState("")
@@ -105,6 +108,8 @@ export default function ApartamentosPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -115,12 +120,14 @@ export default function ApartamentosPage() {
             Gerencie as unidades autônomas, proprietários e responsáveis administrativos
           </p>
         </div>
-        <Link href="/apartamentos/novo">
-          <Button className="gap-2 shadow-xs">
-            <Plus className="h-4 w-4" />
-            <span>Novo Apartamento</span>
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/apartamentos/novo">
+            <Button className="gap-2 shadow-xs">
+              <Plus className="h-4 w-4" />
+              <span>Novo Apartamento</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filters Bar */}
@@ -235,13 +242,28 @@ export default function ApartamentosPage() {
                         )}
                       </td>
                       <td className="px-4 py-3.5">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(apto)}
-                          disabled={updateMut.isPending}
-                          title={`Alternar status do apto ${apto.numero}`}
-                          className="focus:outline-none cursor-pointer"
-                        >
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(apto)}
+                            disabled={updateMut.isPending}
+                            title={`Alternar status do apto ${apto.numero}`}
+                            className="focus:outline-none cursor-pointer"
+                          >
+                            <span
+                              className={`status-pill ${
+                                apto.status === "ocupado"
+                                  ? "status-pill-ocupado"
+                                  : apto.status === "alugado"
+                                  ? "status-pill-alugado"
+                                  : "status-pill-vago"
+                              }`}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                              <span>{statusLabel[apto.status] || apto.status}</span>
+                            </span>
+                          </button>
+                        ) : (
                           <span
                             className={`status-pill ${
                               apto.status === "ocupado"
@@ -254,29 +276,44 @@ export default function ApartamentosPage() {
                             <span className="h-1.5 w-1.5 rounded-full bg-current" />
                             <span>{statusLabel[apto.status] || apto.status}</span>
                           </span>
-                        </button>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex justify-end items-center gap-1">
-                          <Link href={`/apartamentos/${apto.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-500 hover:text-slate-900"
-                              title="Editar unidade"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(apto.id)}
-                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                            title="Excluir unidade"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isAdmin ? (
+                            <>
+                              <Link href={`/apartamentos/${apto.id}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                                  title="Editar unidade"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(apto.id)}
+                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                title="Excluir unidade"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Link href={`/apartamentos/${apto.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs text-primary-600 hover:bg-primary-50"
+                                title="Ver detalhes da unidade"
+                              >
+                                Detalhes
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

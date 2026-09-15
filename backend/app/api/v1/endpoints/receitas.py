@@ -24,7 +24,7 @@ from app.utils.file_storage import get_file_path
 router = APIRouter()
 
 
-@router.get("", response_model=PaginatedResponse[ReceitaResponse], dependencies=[Depends(admin_required)])
+@router.get("", response_model=PaginatedResponse[ReceitaResponse], dependencies=[Depends(get_current_user)])
 async def list_receitas(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -87,7 +87,7 @@ async def duplicar_receitas_mes(
     )
 
 
-@router.get("/{receita_id}", response_model=ReceitaResponse, dependencies=[Depends(admin_required)])
+@router.get("/{receita_id}", response_model=ReceitaResponse, dependencies=[Depends(get_current_user)])
 async def get_receita(receita_id: str, db: AsyncSession = Depends(get_db)):
     return await receita_service.get_receita(db, receita_id)
 

@@ -13,8 +13,11 @@ import { useSortableData } from "@/hooks/use-sortable-data"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { toast } from "sonner"
 import { CircleAlert, Percent, Settings2, RefreshCw, Save } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 export default function InadimplenciaPage() {
+  const { isAdmin } = useAuth()
   const qc = useQueryClient()
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ["inadimplencia", "config"],
@@ -72,6 +75,8 @@ export default function InadimplenciaPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -99,7 +104,9 @@ export default function InadimplenciaPage() {
                   Parâmetros de Multa e Juros por Atraso
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
-                  Defina os encargos aplicados automaticamente após o vencimento
+                  {isAdmin 
+                    ? "Defina os encargos aplicados automaticamente após o vencimento"
+                    : "Encargos vigentes aplicados aos vencimentos em atraso"}
                 </CardDescription>
               </div>
             </div>
@@ -111,6 +118,7 @@ export default function InadimplenciaPage() {
                 <Input
                   type="number"
                   step="0.01"
+                  disabled={!isAdmin}
                   value={form.percentual_multa}
                   onChange={(e) => setForm({ ...form, percentual_multa: e.target.value })}
                   className="bg-white"
@@ -121,6 +129,7 @@ export default function InadimplenciaPage() {
                 <Input
                   type="number"
                   step="0.01"
+                  disabled={!isAdmin}
                   value={form.percentual_juros_mes}
                   onChange={(e) => setForm({ ...form, percentual_juros_mes: e.target.value })}
                   className="bg-white"
@@ -130,6 +139,7 @@ export default function InadimplenciaPage() {
                 <Label className="text-xs font-semibold text-slate-700">Dias de Tolerância</Label>
                 <Input
                   type="number"
+                  disabled={!isAdmin}
                   value={form.dias_tolerancia}
                   onChange={(e) => setForm({ ...form, dias_tolerancia: e.target.value })}
                   className="bg-white"
@@ -137,16 +147,18 @@ export default function InadimplenciaPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={saveConfig} className="gap-2 shadow-xs">
-                <Save className="h-4 w-4" />
-                <span>Salvar Configuração</span>
-              </Button>
-              <Button variant="secondary" onClick={recalcular} className="gap-2">
-                <RefreshCw className="h-4 w-4 text-slate-600" />
-                <span>Recalcular Multas e Juros</span>
-              </Button>
-            </div>
+            {isAdmin && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button onClick={saveConfig} className="gap-2 shadow-xs">
+                  <Save className="h-4 w-4" />
+                  <span>Salvar Configuração</span>
+                </Button>
+                <Button variant="secondary" onClick={recalcular} className="gap-2">
+                  <RefreshCw className="h-4 w-4 text-slate-600" />
+                  <span>Recalcular Multas e Juros</span>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

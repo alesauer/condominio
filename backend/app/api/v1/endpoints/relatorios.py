@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.models.receita import Receita
 from app.models.despesa import Despesa
 
 router = APIRouter()
 
 
-@router.get("/balancete", dependencies=[Depends(admin_required)])
+@router.get("/balancete", dependencies=[Depends(get_current_user)])
 async def balancete(
     mes: int = Query(..., ge=1, le=12),
     ano: int = Query(..., ge=2000, le=2100),

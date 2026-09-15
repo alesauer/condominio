@@ -25,7 +25,7 @@ interface HeaderProps {
 }
 
 export function Header({ onOpenCommandMenu }: HeaderProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin, roleLabel } = useAuth()
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -72,7 +72,11 @@ export function Header({ onOpenCommandMenu }: HeaderProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-2.5 rounded-lg p-1.5 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-primary-700 text-xs font-bold border border-primary-200">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold border ${
+                isAdmin 
+                  ? "bg-primary-100 text-primary-700 border-primary-200" 
+                  : "bg-blue-100 text-blue-700 border-blue-200"
+              }`}>
                 {getInitials(user?.nome)}
               </div>
               <div className="hidden sm:flex flex-col text-left">
@@ -80,7 +84,7 @@ export function Header({ onOpenCommandMenu }: HeaderProps) {
                   {user?.nome || "Usuário"}
                 </span>
                 <span className="text-[10px] text-slate-500 capitalize leading-tight">
-                  {user?.role || "Administrador"}
+                  {roleLabel}
                 </span>
               </div>
             </button>
@@ -90,6 +94,9 @@ export function Header({ onOpenCommandMenu }: HeaderProps) {
               <div className="flex flex-col space-y-0.5">
                 <p className="text-sm font-semibold text-slate-900">{user?.nome}</p>
                 <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                <span className="inline-block mt-1 text-[10px] font-semibold text-primary-600 bg-primary-50 px-2 py-0.5 rounded border border-primary-200 w-fit">
+                  {roleLabel}
+                </span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -97,10 +104,12 @@ export function Header({ onOpenCommandMenu }: HeaderProps) {
               <User className="h-3.5 w-3.5 text-slate-500" />
               <span>Meu Perfil</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 text-xs" onClick={() => router.push("/auditoria")}>
-              <Shield className="h-3.5 w-3.5 text-slate-500" />
-              <span>Registro de Auditoria</span>
-            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem className="gap-2 text-xs" onClick={() => router.push("/auditoria")}>
+                <Shield className="h-3.5 w-3.5 text-slate-500" />
+                <span>Registro de Auditoria</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="gap-2 text-xs text-red-600 focus:text-red-600 focus:bg-red-50"

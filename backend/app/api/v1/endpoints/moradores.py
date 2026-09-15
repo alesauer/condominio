@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.schemas.morador import MoradorCreate, MoradorUpdate, MoradorResponse, VincularApartamento
 from app.schemas.common import PaginatedResponse
 from app.services import morador_service
@@ -12,7 +13,7 @@ from sqlalchemy import select
 router = APIRouter()
 
 
-@router.get("", response_model=PaginatedResponse[MoradorResponse], dependencies=[Depends(admin_required)])
+@router.get("", response_model=PaginatedResponse[MoradorResponse], dependencies=[Depends(get_current_user)])
 async def list_moradores(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -24,7 +25,7 @@ async def list_moradores(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
-@router.get("/{morador_id}", response_model=MoradorResponse, dependencies=[Depends(admin_required)])
+@router.get("/{morador_id}", response_model=MoradorResponse, dependencies=[Depends(get_current_user)])
 async def get_morador(morador_id: str, db: AsyncSession = Depends(get_db)):
     return await morador_service.get_morador(db, morador_id)
 

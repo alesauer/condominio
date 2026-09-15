@@ -17,6 +17,8 @@ import { SortableHeader } from "@/components/ui/sortable-header"
 import { useSortableData } from "@/hooks/use-sortable-data"
 import { Plus, Search, Pencil, Trash2, Home, Mail, Phone, Users } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 const tipoLabel: Record<string, string> = {
   proprietario: "Proprietário",
@@ -41,6 +43,7 @@ const getTipoBadgeStyle = (tipo: string) => {
 }
 
 export default function MoradoresPage() {
+  const { isAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [tipoFilter, setTipoFilter] = useState("")
@@ -79,6 +82,8 @@ export default function MoradoresPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -89,12 +94,14 @@ export default function MoradoresPage() {
             Gerencie os residentes, proprietários, inquilinos e seus vínculos com os apartamentos
           </p>
         </div>
-        <Link href="/moradores/novo">
-          <Button className="gap-2 shadow-xs">
-            <Plus className="h-4 w-4" />
-            <span>Novo Morador</span>
-          </Button>
-        </Link>
+        {isAdmin && (
+          <Link href="/moradores/novo">
+            <Button className="gap-2 shadow-xs">
+              <Plus className="h-4 w-4" />
+              <span>Novo Morador</span>
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Filter Bar */}
@@ -223,25 +230,40 @@ export default function MoradoresPage() {
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link href={`/moradores/${m.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-500 hover:text-slate-900"
-                              title="Editar morador"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(m.id)}
-                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                            title="Excluir cadastro"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isAdmin ? (
+                            <>
+                              <Link href={`/moradores/${m.id}`}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                                  title="Editar morador"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(m.id)}
+                                className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                title="Excluir cadastro"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Link href={`/moradores/${m.id}`}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-xs text-primary-600 hover:bg-primary-50"
+                                title="Ver detalhes do cadastro"
+                              >
+                                Detalhes
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

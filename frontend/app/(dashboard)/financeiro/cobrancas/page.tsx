@@ -59,6 +59,8 @@ import {
 import { toast } from "sonner";
 import { DemonstrativoMensalSheet } from "@/components/financeiro/demonstrativo-mensal-sheet";
 import { CalculoApartamentoModal } from "@/components/financeiro/calculo-apartamento-modal";
+import { useAuth } from "@/hooks/use-auth";
+import { ReadOnlyNotice } from "@/components/auth/admin-gate";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -81,6 +83,7 @@ interface AcaoEventoFormItem {
 }
 
 export default function CobrancasPage() {
+  const { isAdmin } = useAuth();
   const [viewMode, setViewMode] = useState<"demonstrativo" | "lista">("demonstrativo");
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -326,6 +329,8 @@ export default function CobrancasPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Cabeçalho Principal */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-2 border-b border-slate-200/60 print:hidden">
         <div>
@@ -367,22 +372,23 @@ export default function CobrancasPage() {
           </div>
 
           {/* Modal de Geração de Cobranças */}
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 shadow-xs">
-                <PlusCircle className="h-4 w-4" />
-                <span>Gerar Lote do Mês</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-                  <Calculator className="h-5 w-5 text-primary-600" /> Gerar Lote de Cobranças do Mês
-                </DialogTitle>
-                <DialogDescription className="text-xs text-slate-500">
-                  Consolidação automática: soma as despesas do mês divididas igualmente, rateio de água por fração ideal, consumo individual de gás e valor do fundo de reserva por apartamento.
-                </DialogDescription>
-              </DialogHeader>
+          {isAdmin && (
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 shadow-xs">
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Gerar Lote do Mês</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-slate-900">
+                    <Calculator className="h-5 w-5 text-primary-600" /> Gerar Lote de Cobranças do Mês
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Consolidação automática: soma as despesas do mês divididas igualmente, rateio de água por fração ideal, consumo individual de gás e valor do fundo de reserva por apartamento.
+                  </DialogDescription>
+                </DialogHeader>
 
 
               <form onSubmit={handleGerarMensal} className="space-y-4 py-2">
@@ -743,6 +749,7 @@ export default function CobrancasPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -907,7 +914,7 @@ export default function CobrancasPage() {
                                   <span className="hidden sm:inline">Cálculo</span>
                                 </Button>
                               )}
-                              {c.status !== "pago" && (
+                              {isAdmin && c.status !== "pago" && (
                                 <>
                                   <Button
                                     variant="secondary"

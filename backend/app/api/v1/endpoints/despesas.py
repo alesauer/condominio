@@ -23,7 +23,7 @@ from app.utils.file_storage import get_file_path
 router = APIRouter()
 
 
-@router.get("", response_model=PaginatedResponse[DespesaResponse], dependencies=[Depends(admin_required)])
+@router.get("", response_model=PaginatedResponse[DespesaResponse], dependencies=[Depends(get_current_user)])
 async def list_despesas(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -70,7 +70,7 @@ async def duplicar_despesas_mes(
     )
 
 
-@router.get("/{despesa_id}", response_model=DespesaResponse, dependencies=[Depends(admin_required)])
+@router.get("/{despesa_id}", response_model=DespesaResponse, dependencies=[Depends(get_current_user)])
 async def get_despesa(despesa_id: str, db: AsyncSession = Depends(get_db)):
     return await despesa_service.get_despesa(db, despesa_id)
 

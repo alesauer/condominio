@@ -13,6 +13,9 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isAdmin: boolean;
+  isReadOnly: boolean;
+  roleLabel: string;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -64,8 +67,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const isAdmin = user?.role === "admin";
+  const isReadOnly = user?.role === "morador" || user?.role === "proprietario";
+  
+  let roleLabel = "Visitante";
+  if (user?.role === "admin") {
+    roleLabel = "Síndico (Admin)";
+  } else if (user?.role === "morador") {
+    roleLabel = "Morador";
+  } else if (user?.role === "proprietario") {
+    roleLabel = "Proprietário";
+  }
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        isAdmin,
+        isReadOnly,
+        roleLabel,
+        login,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

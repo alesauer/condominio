@@ -21,10 +21,12 @@ from app.schemas.common import PaginatedResponse
 from app.services import cobranca_service
 from app.utils.pagination import paginate
 
+from app.api.deps import get_current_user
+
 router = APIRouter()
 
 
-@router.get("/demonstrativo-mensal", response_model=DemonstrativoMensalResponse, dependencies=[Depends(admin_required)])
+@router.get("/demonstrativo-mensal", response_model=DemonstrativoMensalResponse, dependencies=[Depends(get_current_user)])
 async def obter_demonstrativo_mensal(
     competencia: date = Query(..., description="Mês de competência (ex: 2026-09-01)"),
     db: AsyncSession = Depends(get_db),
@@ -80,7 +82,7 @@ async def delete_acao_evento(
     return None
 
 
-@router.get("", response_model=PaginatedResponse[CobrancaResponse], dependencies=[Depends(admin_required)])
+@router.get("", response_model=PaginatedResponse[CobrancaResponse], dependencies=[Depends(get_current_user)])
 async def list_cobrancas(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -112,7 +114,7 @@ async def gerar_cobrancas_mensais(
     return await cobranca_service.gerar_cobrancas_mensais(db, data.model_dump(), usuario=current_user)
 
 
-@router.get("/{cobranca_id}", response_model=CobrancaResponse, dependencies=[Depends(admin_required)])
+@router.get("/{cobranca_id}", response_model=CobrancaResponse, dependencies=[Depends(get_current_user)])
 async def get_cobranca(cobranca_id: str, db: AsyncSession = Depends(get_db)):
     return await cobranca_service.get_cobranca(db, cobranca_id)
 

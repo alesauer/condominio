@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { ArrowLeft, Repeat, Info } from "lucide-react";
+import { AdminGate, RestrictedPageNotice } from "@/components/auth/admin-gate";
 
 export default function NovaReceitaPage() {
   const router = useRouter();
@@ -67,8 +68,9 @@ export default function NovaReceitaPage() {
   };
 
   return (
-    <div className="max-w-xl space-y-4">
-      <div className="flex items-center gap-2">
+    <AdminGate fallback={<RestrictedPageNotice backHref="/financeiro/receitas" backLabel="Voltar para Receitas" />}>
+      <div className="max-w-xl space-y-4">
+        <div className="flex items-center gap-2">
         <Link href="/financeiro/receitas">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
@@ -237,5 +239,6 @@ export default function NovaReceitaPage() {
         </CardContent>
       </Card>
     </div>
+    </AdminGate>
   );
 }

@@ -13,11 +13,11 @@ class CategoriaDocumento(str, enum.Enum):
     contratos = "contratos"
     convencao = "convencao"
     outros = "outros"
-    # Aliases
-    ata = "atas"
-    boleto = "boletos"
-    comprovante = "comprovantes"
-    contrato = "contratos"
+    # Singular aliases with matching values for legacy DB records
+    ata = "ata"
+    boleto = "boleto"
+    comprovante = "comprovante"
+    contrato = "contrato"
 
 
 

@@ -17,6 +17,8 @@ import {
 import { formatDate } from "@/lib/utils"
 import { Upload, Download, Trash2, Files, Loader2, FileText } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 const categoriaLabel: Record<string, string> = {
   atas: "Atas",
@@ -28,6 +30,7 @@ const categoriaLabel: Record<string, string> = {
 }
 
 export default function DocumentosPage() {
+  const { isAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const [categoria, setCategoria] = useState("all")
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
@@ -105,6 +108,8 @@ export default function DocumentosPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -116,14 +121,16 @@ export default function DocumentosPage() {
           </p>
         </div>
 
-        <label>
-          <Button asChild className="cursor-pointer gap-2 shadow-xs">
-            <span>
-              <Upload className="h-4 w-4" /> Enviar Documento
-            </span>
-          </Button>
-          <input type="file" className="hidden" onChange={handleUpload} />
-        </label>
+        {isAdmin && (
+          <label>
+            <Button asChild className="cursor-pointer gap-2 shadow-xs">
+              <span>
+                <Upload className="h-4 w-4" /> Enviar Documento
+              </span>
+            </Button>
+            <input type="file" className="hidden" onChange={handleUpload} />
+          </label>
+        )}
       </div>
 
       {/* Filter Toolbar */}
@@ -214,15 +221,17 @@ export default function DocumentosPage() {
                               <Download className="h-4 w-4" />
                             )}
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(d.id)}
-                            title="Excluir arquivo"
-                            className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDelete(d.id)}
+                              title="Excluir arquivo"
+                              className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

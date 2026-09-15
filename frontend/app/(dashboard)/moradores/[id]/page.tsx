@@ -19,8 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Building2, User, Link as LinkIcon, Trash2, PlusCircle, Check } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/hooks/use-auth";
+import { ReadOnlyNotice } from "@/components/auth/admin-gate";
 
 export default function EditMoradorPage() {
+  const { isAdmin } = useAuth();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: morador, isLoading, refetch } = useMorador(id);
@@ -139,6 +142,8 @@ export default function EditMoradorPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
+      <ReadOnlyNotice />
+
       {/* Header */}
       <div className="flex items-center gap-2">
         <Link href="/moradores">
@@ -149,7 +154,7 @@ export default function EditMoradorPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{morador.nome}</h1>
           <p className="text-sm text-muted-foreground">
-            Edição de dados cadastrais e gestão de vínculos com apartamentos
+            {isAdmin ? "Edição de dados cadastrais e gestão de vínculos com apartamentos" : "Visualização de dados cadastrais e vínculos com apartamentos"}
           </p>
         </div>
       </div>
@@ -240,11 +245,13 @@ export default function EditMoradorPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-2">
-                  <Button type="submit" disabled={updateMut.isPending}>
-                    {updateMut.isPending ? "Salvando..." : "Salvar Alterações"}
-                  </Button>
-                </div>
+                {isAdmin && (
+                  <div className="flex justify-end pt-2">
+                    <Button type="submit" disabled={updateMut.isPending}>
+                      {updateMut.isPending ? "Salvando..." : "Salvar Alterações"}
+                    </Button>
+                  </div>
+                )}
               </form>
             </CardContent>
           </Card>
@@ -296,17 +303,19 @@ export default function EditMoradorPage() {
                           )}
                         </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDesvincularApartamento(ap.apartamento_id, ap.numero)}
-                        title="Desvincular este apartamento"
-                        disabled={desvincularMut.isPending}
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDesvincularApartamento(ap.apartamento_id, ap.numero)}
+                          title="Desvincular este apartamento"
+                          disabled={desvincularMut.isPending}
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   ))
                 ) : (
@@ -317,68 +326,70 @@ export default function EditMoradorPage() {
               </div>
 
               {/* Form para vincular novo apartamento */}
-              <form onSubmit={handleVincularApartamento} className="pt-3 border-t space-y-3">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Vincular Nova Unidade
-                </Label>
-
-                <div className="space-y-2">
-                  <Select
-                    value={selectedApartamentoToLink}
-                    onValueChange={(v) => setSelectedApartamentoToLink(v)}
-                  >
-                    <SelectTrigger className="text-xs h-9">
-                      <SelectValue placeholder="Escolha um apartamento..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {aptosData?.items?.map((apto) => (
-                        <SelectItem key={apto.id} value={apto.id}>
-                          Apto {apto.numero} {apto.bloco ? `(${apto.bloco})` : ""} - {apto.tipo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Select
-                    value={tipoVinculoNovo}
-                    onValueChange={(v: "residente" | "proprietario") => setTipoVinculoNovo(v)}
-                  >
-                    <SelectTrigger className="text-xs h-9">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="residente">Vínculo: Residente / Inquilino</SelectItem>
-                      <SelectItem value="proprietario">Vínculo: Proprietário</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="definirComoRespMorador"
-                    checked={definirComoResp}
-                    onChange={(e) => setDefinirComoResp(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                  />
-                  <Label htmlFor="definirComoRespMorador" className="text-xs font-normal cursor-pointer">
-                    Definir como Responsável Administrativo / Financeiro
+              {isAdmin && (
+                <form onSubmit={handleVincularApartamento} className="pt-3 border-t space-y-3">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Vincular Nova Unidade
                   </Label>
-                </div>
 
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  disabled={!selectedApartamentoToLink || vincularMut.isPending}
-                  className="w-full text-xs"
-                >
-                  <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
-                  {vincularMut.isPending ? "Vinculando..." : "Adicionar Vínculo"}
-                </Button>
-              </form>
+                  <div className="space-y-2">
+                    <Select
+                      value={selectedApartamentoToLink}
+                      onValueChange={(v) => setSelectedApartamentoToLink(v)}
+                    >
+                      <SelectTrigger className="text-xs h-9">
+                        <SelectValue placeholder="Escolha um apartamento..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {aptosData?.items?.map((apto) => (
+                          <SelectItem key={apto.id} value={apto.id}>
+                            Apto {apto.numero} {apto.bloco ? `(${apto.bloco})` : ""} - {apto.tipo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Select
+                      value={tipoVinculoNovo}
+                      onValueChange={(v: "residente" | "proprietario") => setTipoVinculoNovo(v)}
+                    >
+                      <SelectTrigger className="text-xs h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="residente">Vínculo: Residente / Inquilino</SelectItem>
+                        <SelectItem value="proprietario">Vínculo: Proprietário</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="definirComoRespMorador"
+                      checked={definirComoResp}
+                      onChange={(e) => setDefinirComoResp(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="definirComoRespMorador" className="text-xs font-normal cursor-pointer">
+                      Definir como Responsável Administrativo / Financeiro
+                    </Label>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    disabled={!selectedApartamentoToLink || vincularMut.isPending}
+                    className="w-full text-xs"
+                  >
+                    <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+                    {vincularMut.isPending ? "Vinculando..." : "Adicionar Vínculo"}
+                  </Button>
+                </form>
+              )}
             </CardContent>
           </Card>
         </div>

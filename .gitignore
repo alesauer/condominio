@@ -35,4 +35,7 @@ backend/data/uploads/
 # Misc
 *.log
 scratch/
+.env
+.env.*
+*.env
 

@@ -25,6 +25,8 @@ import {
   HelpCircle,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useAuth } from "@/hooks/use-auth"
+import { ReadOnlyNotice } from "@/components/auth/admin-gate"
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -53,6 +55,7 @@ interface RowState {
 }
 
 export default function GasPage() {
+  const { isAdmin } = useAuth()
   const today = new Date()
   const [selectedYear, setSelectedYear] = useState(today.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1)
@@ -265,6 +268,8 @@ export default function GasPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -306,23 +311,25 @@ export default function GasPage() {
           </div>
 
           {/* Botão Salvar */}
-          <Button
-            onClick={handleSalvar}
-            disabled={salvarMut.isPending}
-            className={`gap-2 shadow-xs ${
-              hasUnsavedChanges
-                ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
-                : ""
-            }`}
-          >
-            <Save className="h-4 w-4" />
-            <span>{salvarMut.isPending ? "Salvando..." : "Salvar Leituras"}</span>
-            {hasUnsavedChanges && (
-              <span className="ml-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-bold">
-                Ctrl+S
-              </span>
-            )}
-          </Button>
+          {isAdmin && (
+            <Button
+              onClick={handleSalvar}
+              disabled={salvarMut.isPending}
+              className={`gap-2 shadow-xs ${
+                hasUnsavedChanges
+                  ? "bg-amber-600 hover:bg-amber-700 text-white animate-pulse"
+                  : ""
+              }`}
+            >
+              <Save className="h-4 w-4" />
+              <span>{salvarMut.isPending ? "Salvando..." : "Salvar Leituras"}</span>
+              {hasUnsavedChanges && (
+                <span className="ml-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-bold">
+                  Ctrl+S
+                </span>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -485,6 +492,7 @@ export default function GasPage() {
                           ref={(el) => { inputRefs.current[`anterior-${idx}`] = el }}
                           type="text"
                           inputMode="decimal"
+                          disabled={!isAdmin}
                           className="h-8 text-right text-xs font-mono font-medium bg-slate-50 border-slate-200"
                           value={row.leitura_anterior}
                           onChange={(e) => {
@@ -503,6 +511,7 @@ export default function GasPage() {
                           ref={(el) => { inputRefs.current[`atual-${idx}`] = el }}
                           type="text"
                           inputMode="decimal"
+                          disabled={!isAdmin}
                           className={`h-8 text-right text-xs font-mono font-bold bg-white ${
                             isFilled
                               ? "border-primary-400 text-slate-900"
@@ -517,7 +526,7 @@ export default function GasPage() {
                           }}
                           onKeyDown={(e) => handleKeyDownInput(e, idx, "atual")}
                           placeholder="Leitura..."
-                          autoFocus={idx === 0}
+                          autoFocus={isAdmin && idx === 0}
                         />
                       </td>
 

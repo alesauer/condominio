@@ -39,6 +39,7 @@ import {
 import { exportDemonstrativoPDF } from "@/lib/export-demonstrativo-pdf";
 import { CalculoApartamentoModal } from "@/components/financeiro/calculo-apartamento-modal";
 import { EnviarDemonstrativoEmailModal } from "@/components/financeiro/enviar-demonstrativo-email-modal";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 
 interface DemonstrativoMensalSheetProps {
@@ -52,6 +53,7 @@ export function DemonstrativoMensalSheet({
   isLoading,
   onRefresh,
 }: DemonstrativoMensalSheetProps) {
+  const { isAdmin } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editItems, setEditItems] = useState<
@@ -349,14 +351,16 @@ export function DemonstrativoMensalSheet({
           >
             <FileDown className="h-4 w-4 mr-1.5" /> Salvar PDF
           </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => setEmailModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-          >
-            <Mail className="h-4 w-4 mr-1.5" /> Enviar por E-mail
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setEmailModalOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+            >
+              <Mail className="h-4 w-4 mr-1.5" /> Enviar por E-mail
+            </Button>
+          )}
         </div>
       </div>
 
@@ -619,15 +623,17 @@ export function DemonstrativoMensalSheet({
         <div className="space-y-1">
           <div className="bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-slate-200 px-3 py-1 font-bold flex items-center justify-between uppercase tracking-wide rounded-t text-xs">
             <div className="flex-1 text-center">Ações / Eventos Realizados no Mês</div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleOpenModal}
-              className="h-6 text-[11px] gap-1 px-2.5 print:hidden bg-background text-primary hover:text-primary hover:bg-primary/10 shadow-xs border-slate-300 dark:border-slate-700"
-            >
-              <Plus className="h-3 w-3" /> Gerenciar Ações
-            </Button>
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleOpenModal}
+                className="h-6 text-[11px] gap-1 px-2.5 print:hidden bg-background text-primary hover:text-primary hover:bg-primary/10 shadow-xs border-slate-300 dark:border-slate-700"
+              >
+                <Plus className="h-3 w-3" /> Gerenciar Ações
+              </Button>
+            )}
           </div>
           <div className="border border-slate-300 dark:border-slate-800 rounded-b overflow-x-auto">
             <table className="w-full text-left border-collapse text-[11px] sm:text-xs">
@@ -642,14 +648,16 @@ export function DemonstrativoMensalSheet({
                   <tr>
                     <td colSpan={2} className="p-3 text-center text-muted-foreground italic">
                       Nenhum comunicado ou evento extraordinário registrado no mês.
-                      <Button
-                        variant="link"
-                        size="sm"
-                        onClick={handleOpenModal}
-                        className="text-xs text-primary p-0 ml-2 print:hidden h-auto"
-                      >
-                        + Adicionar Ação
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={handleOpenModal}
+                          className="text-xs text-primary p-0 ml-2 print:hidden h-auto"
+                        >
+                          + Adicionar Ação
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -696,16 +704,18 @@ export function DemonstrativoMensalSheet({
               <div className="border border-slate-200 dark:border-slate-800 rounded overflow-hidden">
                 <div className="bg-slate-100 dark:bg-slate-900 p-1.5 px-2.5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
                   <span className="font-bold text-xs uppercase">Troca do Gás</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleOpenTrocaGasModal}
-                    className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1 print:hidden"
-                    title="Editar datas e previsão da troca de gás"
-                  >
-                    <Pencil className="h-3 w-3" /> Editar Datas
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleOpenTrocaGasModal}
+                      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground gap-1 print:hidden"
+                      title="Editar datas e previsão da troca de gás"
+                    >
+                      <Pencil className="h-3 w-3" /> Editar Datas
+                    </Button>
+                  )}
                 </div>
                 <div className="p-2 space-y-2 text-xs">
                   <div className="grid grid-cols-2 text-center gap-2 border-b pb-2">

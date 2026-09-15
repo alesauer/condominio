@@ -39,12 +39,19 @@ def test_engine():
 
 
 async def _init_db(test_engine):
-    """Create all tables."""
+    """Create all tables and clean data between tests."""
     import app.models  # noqa: F401
     from app.core.database import Base as _Base
+    from sqlalchemy import text
 
     async with test_engine.begin() as conn:
         await conn.run_sync(_Base.metadata.create_all)
+        for table in reversed(_Base.metadata.sorted_tables):
+            try:
+                await conn.execute(text(f'TRUNCATE TABLE "{table.name}" CASCADE;'))
+            except Exception:
+                pass
+
 
 
 @pytest_asyncio.fixture
@@ -90,3 +97,53 @@ async def client_admin(db_session: AsyncSession, admin_user) -> AsyncIterator[As
         yield client
 
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def client_morador(db_session: AsyncSession, regular_user) -> AsyncIterator[AsyncClient]:
+    """HTTPX client with regular morador auth (read-only) and test DB."""
+    from app.core.database import get_db
+    from app.api.deps import get_current_user
+    from app.main import app
+
+    async def override_get_db():
+        yield db_session
+
+    async def override_get_current_user():
+        return regular_user
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def client_proprietario(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+    """HTTPX client with proprietario auth (read-only) and test DB."""
+    from app.core.database import get_db
+    from app.api.deps import get_current_user
+    from app.models.usuario import Usuario, RoleUsuario
+    from app.main import app
+
+    prop_user = Usuario(id=uuid.uuid4(), nome="Proprietário Teste", email="prop@teste.com", senha_hash="fake_hash", role=RoleUsuario.proprietario, ativo=True)
+
+    async def override_get_db():
+        yield db_session
+
+    async def override_get_current_user():
+        return prop_user
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+    app.dependency_overrides.clear()
+

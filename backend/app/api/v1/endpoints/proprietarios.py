@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.permissions import admin_required
+from app.api.deps import get_current_user
 from app.schemas.proprietario import ProprietarioCreate, ProprietarioUpdate, ProprietarioResponse
 from app.schemas.apartamento import ApartamentoListResponse
 from app.schemas.common import PaginatedResponse
@@ -13,7 +14,7 @@ from app.models.apartamento import Apartamento
 router = APIRouter()
 
 
-@router.get("", response_model=PaginatedResponse[ProprietarioResponse], dependencies=[Depends(admin_required)])
+@router.get("", response_model=PaginatedResponse[ProprietarioResponse], dependencies=[Depends(get_current_user)])
 async def list_proprietarios(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -24,7 +25,7 @@ async def list_proprietarios(
     return await paginate(db, query, page=page, page_size=page_size)
 
 
-@router.get("/{proprietario_id}", response_model=ProprietarioResponse, dependencies=[Depends(admin_required)])
+@router.get("/{proprietario_id}", response_model=ProprietarioResponse, dependencies=[Depends(get_current_user)])
 async def get_proprietario(proprietario_id: str, db: AsyncSession = Depends(get_db)):
     return await proprietario_service.get_proprietario(db, proprietario_id)
 

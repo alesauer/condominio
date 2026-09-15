@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/utils"
+import { AdminGate, ReadOnlyNotice } from "@/components/auth/admin-gate"
 import {
   Wallet,
   TrendingUp,
@@ -116,6 +117,8 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
+      <ReadOnlyNotice />
+
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div>
@@ -133,12 +136,14 @@ export default function OverviewPage() {
               <span>Cobranças</span>
             </Button>
           </Link>
-          <Link href="/financeiro/despesas">
-            <Button size="sm" className="gap-2 shadow-xs">
-              <PlusCircle className="h-4 w-4" />
-              <span>Nova Despesa</span>
-            </Button>
-          </Link>
+          <AdminGate>
+            <Link href="/financeiro/despesas/nova">
+              <Button size="sm" className="gap-2 shadow-xs">
+                <PlusCircle className="h-4 w-4" />
+                <span>Nova Despesa</span>
+              </Button>
+            </Link>
+          </AdminGate>
         </div>
       </div>
 

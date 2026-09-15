@@ -22,7 +22,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { formatDate } from "@/lib/utils"
-import { History, Eye, Filter } from "lucide-react"
+import { History, Eye, Filter, ShieldAlert } from "lucide-react"
+import { useAuth } from "@/hooks/use-auth"
 
 const getAcaoBadgeStyle = (acao: string) => {
   switch (acao) {
@@ -39,7 +40,10 @@ const getAcaoBadgeStyle = (acao: string) => {
   }
 }
 
+
+
 export default function AuditoriaPage() {
+  const { isAdmin } = useAuth()
   const [page, setPage] = useState(1)
   const [entidade, setEntidade] = useState("all")
   const [selectedLog, setSelectedLog] = useState<any | null>(null)
@@ -54,7 +58,22 @@ export default function AuditoriaPage() {
           params: { page, page_size: 15, entidade_tipo: entFilter },
         })
         .then((r) => r.data),
+    enabled: isAdmin,
   })
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center rounded-xl border border-slate-200 bg-white">
+        <div className="h-12 w-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mb-4">
+          <ShieldAlert className="h-6 w-6" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900">Acesso Restrito ao Síndico</h2>
+        <p className="text-sm text-slate-500 max-w-md mt-1">
+          O registro de trilha de auditoria é confidencial e restrito à administração do condomínio.
+        </p>
+      </div>
+    )
+  }
 
   const { items: sortedItems, sortField, sortDirection, requestSort } = useSortableData(
     data?.items || [],

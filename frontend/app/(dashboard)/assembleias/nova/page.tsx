@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   Loader2,
 } from "lucide-react"
+import { AdminGate, RestrictedPageNotice } from "@/components/auth/admin-gate"
 
 interface PautaItem {
   ordem: number
@@ -154,8 +155,9 @@ export default function NovaAssembleiaPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
-      {/* Header */}
+    <AdminGate fallback={<RestrictedPageNotice backHref="/assembleias" backLabel="Voltar para Assembleias" />}>
+      <div className="max-w-4xl mx-auto space-y-6 pb-12">
+        {/* Header */}
       <div className="flex items-center justify-between gap-4 pb-2 border-b border-slate-200/60">
         <div className="flex items-center gap-3">
           <Link href="/assembleias">
@@ -438,6 +440,7 @@ export default function NovaAssembleiaPage() {
         </div>
       </form>
     </div>
+    </AdminGate>
   )
 }
 
