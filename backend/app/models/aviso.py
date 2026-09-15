@@ -16,6 +16,11 @@ class Aviso(Base, BaseModelMixin):
 
     titulo = Column(String(255), nullable=False)
     descricao = Column(Text, nullable=False)
-    prioridade = Column(SQLEnum(PrioridadeAviso), nullable=False, default=PrioridadeAviso.baixa)
+    prioridade = Column(
+        SQLEnum(PrioridadeAviso, name="prioridadeaviso", create_type=False, values_callable=lambda obj: [e.value for e in obj]),
+        nullable=False,
+        default=PrioridadeAviso.baixa,
+    )
     data_publicacao = Column(Date, nullable=False, index=True)
     enviar_email = Column(Boolean, nullable=False, default=False)
+

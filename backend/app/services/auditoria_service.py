@@ -1,6 +1,7 @@
 import uuid
 from typing import Optional, Any, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models.auditoria import Auditoria
 from app.models.usuario import Usuario
 
@@ -55,6 +56,14 @@ async def registrar_auditoria(
                 except (ValueError, TypeError):
                     usuario_id = None
 
+            if usuario_id:
+                try:
+                    u_check = await db.execute(select(Usuario.id).where(Usuario.id == usuario_id))
+                    if not u_check.scalar_one_or_none():
+                        usuario_id = None
+                except Exception:
+                    usuario_id = None
+
         log = Auditoria(
             usuario_id=usuario_id,
             usuario_nome=usuario_nome,
@@ -69,4 +78,5 @@ async def registrar_auditoria(
         return log
     except Exception:
         return None
+
 

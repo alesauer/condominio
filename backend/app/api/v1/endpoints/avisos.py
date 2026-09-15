@@ -9,8 +9,9 @@ from app.models.morador import Morador
 from app.models.proprietario import Proprietario
 from app.services.email_service import send_email
 from app.services.auditoria_service import registrar_auditoria
+from app.schemas.aviso import AvisoCreate, AvisoUpdate, AvisoResponse
+from app.schemas.common import PaginatedResponse
 from app.utils.pagination import paginate
-from pydantic import BaseModel
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
@@ -20,28 +21,7 @@ logger = logging.getLogger("condo.avisos")
 router = APIRouter()
 
 
-class AvisoCreate(BaseModel):
-    titulo: str
-    descricao: str
-    prioridade: str = "baixa"
-    enviar_email: bool = False
-
-
-class AvisoResponse(BaseModel):
-    id: UUID
-    titulo: str
-    descricao: str
-    prioridade: str
-    data_publicacao: date
-    enviar_email: bool
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-@router.get("", response_model=dict, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=PaginatedResponse[AvisoResponse], dependencies=[Depends(get_current_user)])
 async def list_avisos(
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
