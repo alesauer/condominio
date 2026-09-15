@@ -7,12 +7,18 @@ import enum
 
 
 class CategoriaDocumento(str, enum.Enum):
-    ata = "ata"
-    boleto = "boleto"
-    comprovante = "comprovante"
-    contrato = "contrato"
+    atas = "atas"
+    boletos = "boletos"
+    comprovantes = "comprovantes"
+    contratos = "contratos"
     convencao = "convencao"
     outros = "outros"
+    # Aliases
+    ata = "atas"
+    boleto = "boletos"
+    comprovante = "comprovantes"
+    contrato = "contratos"
+
 
 
 class Documento(Base, BaseModelMixin):

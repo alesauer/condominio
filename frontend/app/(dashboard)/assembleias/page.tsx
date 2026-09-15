@@ -129,15 +129,14 @@ export default function AssembleiasPage() {
         formData.append("conteudo", modalConteudo.trim())
       }
 
-      await api.post(`/assembleias/${attachAtaAssembleia.id}/ata`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      await api.post(`/assembleias/${attachAtaAssembleia.id}/ata`, formData)
 
       qc.invalidateQueries({ queryKey: ["assembleias"] })
       toast.success("Ata atualizada com sucesso!")
       setAttachAtaAssembleia(null)
-    } catch {
-      toast.error("Erro ao atualizar ata da assembleia.")
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || "Erro ao atualizar ata da assembleia."
+      toast.error(msg)
     } finally {
       setModalLoading(false)
     }

@@ -140,9 +140,7 @@ export default function NovaAssembleiaPage() {
           formData.append("conteudo", form.ata_conteudo.trim())
         }
 
-        await api.post(`/assembleias/${assembleiaId}/ata`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        })
+        await api.post(`/assembleias/${assembleiaId}/ata`, formData)
       }
 
       toast.success("Assembleia criada com sucesso!")

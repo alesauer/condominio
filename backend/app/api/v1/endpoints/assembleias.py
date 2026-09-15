@@ -201,15 +201,18 @@ async def upload_ata_assembleia(
         if file and file.filename:
             file_path = await save_upload(file, "atas")
             # Registra no acervo de Documentos
-            doc = Documento(
-                nome=f"Ata - {assembleia.titulo} ({assembleia.data.strftime('%d/%m/%Y')})",
-                descricao=f"Ata e anexos da assembleia realizada em {assembleia.data.strftime('%d/%m/%Y')}",
-                categoria="ata",
-                caminho_arquivo=file_path,
-                tamanho_bytes=file.size,
-                tipo_mime=file.content_type,
-            )
-            db.add(doc)
+            try:
+                doc = Documento(
+                    nome=f"Ata - {assembleia.titulo} ({assembleia.data.strftime('%d/%m/%Y')})",
+                    descricao=f"Ata e anexos da assembleia realizada em {assembleia.data.strftime('%d/%m/%Y')}",
+                    categoria="atas",
+                    caminho_arquivo=file_path,
+                    tamanho_bytes=file.size or 0,
+                    tipo_mime=file.content_type,
+                )
+                db.add(doc)
+            except Exception as doc_err:
+                logger.warning(f"Erro ao registrar documento no acervo: {doc_err}")
 
         ata = assembleia.ata
         if ata:
