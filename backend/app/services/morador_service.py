@@ -22,25 +22,23 @@ async def create_morador(db: AsyncSession, data: dict) -> Morador:
     if apartamento_id:
         aid = UUID(str(apartamento_id))
         mid = morador.id
-        if str(morador.tipo) == "proprietario":
-            apto_res = await db.execute(select(Apartamento).where(Apartamento.id == aid))
-            apto = apto_res.scalar_one_or_none()
-            if apto:
+
+        # 1. Sempre cria o vínculo em ApartamentoMorador
+        vinculo = ApartamentoMorador(
+            morador_id=mid,
+            apartamento_id=aid,
+            data_inicio=date.today(),
+        )
+        db.add(vinculo)
+
+        # 2. Atualiza proprietário e/ou responsável no Apartamento se aplicável
+        apto_res = await db.execute(select(Apartamento).where(Apartamento.id == aid))
+        apto = apto_res.scalar_one_or_none()
+        if apto:
+            if str(morador.tipo) == "proprietario":
                 apto.proprietario_id = mid
-                if definir_como_responsavel or apto.responsavel_id is None:
-                    apto.responsavel_id = mid
-        else:
-            vinculo = ApartamentoMorador(
-                morador_id=mid,
-                apartamento_id=aid,
-                data_inicio=date.today(),
-            )
-            db.add(vinculo)
-            if definir_como_responsavel:
-                apto_res = await db.execute(select(Apartamento).where(Apartamento.id == aid))
-                apto = apto_res.scalar_one_or_none()
-                if apto:
-                    apto.responsavel_id = mid
+            if definir_como_responsavel or (str(morador.tipo) == "proprietario" and apto.responsavel_id is None):
+                apto.responsavel_id = mid
 
     await db.commit()
     return await get_morador(db, str(morador.id))
@@ -98,32 +96,27 @@ async def update_morador(db: AsyncSession, morador_id: str | UUID, data: dict) -
 
     if apartamento_id is not None:
         aid = UUID(str(apartamento_id))
-        if str(morador.tipo) == "proprietario":
-            apto_res = await db.execute(select(Apartamento).where(Apartamento.id == aid))
-            apto = apto_res.scalar_one_or_none()
-            if apto:
-                apto.proprietario_id = mid
-                if definir_como_responsavel:
-                    apto.responsavel_id = mid
-        else:
-            am_res = await db.execute(
-                select(ApartamentoMorador).where(
-                    ApartamentoMorador.morador_id == mid,
-                    ApartamentoMorador.apartamento_id == aid,
-                )
+        am_res = await db.execute(
+            select(ApartamentoMorador).where(
+                ApartamentoMorador.morador_id == mid,
+                ApartamentoMorador.apartamento_id == aid,
             )
-            if not am_res.scalar_one_or_none():
-                vinculo = ApartamentoMorador(
-                    morador_id=mid,
-                    apartamento_id=aid,
-                    data_inicio=date.today(),
-                )
-                db.add(vinculo)
+        )
+        if not am_res.scalar_one_or_none():
+            vinculo = ApartamentoMorador(
+                morador_id=mid,
+                apartamento_id=aid,
+                data_inicio=date.today(),
+            )
+            db.add(vinculo)
+
+        apto_res = await db.execute(select(Apartamento).where(Apartamento.id == aid))
+        apto = apto_res.scalar_one_or_none()
+        if apto:
+            if str(morador.tipo) == "proprietario":
+                apto.proprietario_id = mid
             if definir_como_responsavel:
-                apto_res = await db.execute(select(Apartamento).where(Apartamento.id == aid))
-                apto = apto_res.scalar_one_or_none()
-                if apto:
-                    apto.responsavel_id = mid
+                apto.responsavel_id = mid
 
     await db.commit()
     return await get_morador(db, mid)
@@ -165,32 +158,33 @@ async def vincular_apartamento(db: AsyncSession, morador_id: str | UUID, data: d
     if not apto:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Apartamento não encontrado")
 
-    if tipo_vinculo == "proprietario":
-        apto.proprietario_id = mid
-        if definir_como_responsavel:
-            apto.responsavel_id = mid
-    else:
-        am_res = await db.execute(
-            select(ApartamentoMorador).where(
-                ApartamentoMorador.morador_id == mid,
-                ApartamentoMorador.apartamento_id == aid,
-            )
+    # 1. Sempre garante que o registro em ApartamentoMorador existe
+    am_res = await db.execute(
+        select(ApartamentoMorador).where(
+            ApartamentoMorador.morador_id == mid,
+            ApartamentoMorador.apartamento_id == aid,
         )
-        am = am_res.scalar_one_or_none()
-        if not am:
-            vinculo = ApartamentoMorador(
-                morador_id=mid,
-                apartamento_id=aid,
-                data_inicio=data_inicio,
-                data_fim=data_fim,
-            )
-            db.add(vinculo)
-        else:
+    )
+    am = am_res.scalar_one_or_none()
+    if not am:
+        vinculo = ApartamentoMorador(
+            morador_id=mid,
+            apartamento_id=aid,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+        )
+        db.add(vinculo)
+    else:
+        if data_inicio:
             am.data_inicio = data_inicio
+        if data_fim:
             am.data_fim = data_fim
 
-        if definir_como_responsavel:
-            apto.responsavel_id = mid
+    # 2. Atualiza proprietario_id e/ou responsavel_id se necessário
+    if tipo_vinculo == "proprietario":
+        apto.proprietario_id = mid
+    if definir_como_responsavel:
+        apto.responsavel_id = mid
 
     await db.commit()
     return await get_morador(db, mid)
@@ -228,4 +222,5 @@ async def desvincular_apartamento(db: AsyncSession, morador_id: str | UUID, apar
         await db.delete(vinculo)
 
     await db.commit()
+
 
