@@ -28,7 +28,21 @@ class ApartamentoCreate(BaseModel):
 
     @field_validator("proprietario_id", "responsavel_id", mode="before")
     @classmethod
+    def empty_uuid_to_none(cls, v):
+        if v == "" or v == "none" or v is None:
+            return None
+        return v
+
+    @field_validator("bloco", "vaga_demarcada", mode="before")
+    @classmethod
     def empty_str_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+
+    @field_validator("fracao_ideal", "metragem", mode="before")
+    @classmethod
+    def empty_float_to_none(cls, v):
         if v == "" or v is None:
             return None
         return v
@@ -47,7 +61,21 @@ class ApartamentoUpdate(BaseModel):
 
     @field_validator("proprietario_id", "responsavel_id", mode="before")
     @classmethod
+    def empty_uuid_to_none(cls, v):
+        if v == "" or v == "none" or v is None:
+            return None
+        return v
+
+    @field_validator("bloco", "vaga_demarcada", mode="before")
+    @classmethod
     def empty_str_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+
+    @field_validator("fracao_ideal", "metragem", mode="before")
+    @classmethod
+    def empty_float_to_none(cls, v):
         if v == "" or v is None:
             return None
         return v

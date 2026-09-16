@@ -17,6 +17,13 @@ class ApartamentoVinculoInfo(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator("data_inicio", "data_fim", mode="before")
+    @classmethod
+    def empty_date_to_none_info(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class MoradorCreate(BaseModel):
     nome: str
@@ -31,7 +38,14 @@ class MoradorCreate(BaseModel):
     @field_validator("apartamento_id", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
-        if v == "" or v is None:
+        if v == "" or v == "none" or v is None:
+            return None
+        return v
+
+    @field_validator("cpf", "telefone", "email", "veiculo", mode="before")
+    @classmethod
+    def empty_strings_to_none(cls, v):
+        if v == "":
             return None
         return v
 
@@ -49,7 +63,14 @@ class MoradorUpdate(BaseModel):
     @field_validator("apartamento_id", mode="before")
     @classmethod
     def empty_str_to_none(cls, v):
-        if v == "" or v is None:
+        if v == "" or v == "none" or v is None:
+            return None
+        return v
+
+    @field_validator("cpf", "telefone", "email", "veiculo", mode="before")
+    @classmethod
+    def empty_strings_to_none(cls, v):
+        if v == "":
             return None
         return v
 
@@ -142,3 +163,32 @@ class VincularApartamento(BaseModel):
     definir_como_responsavel: Optional[bool] = False
     data_inicio: Optional[date] = None
     data_fim: Optional[date] = None
+
+    @field_validator("apartamento_id", mode="before")
+    @classmethod
+    def validate_apartamento_id(cls, v):
+        if v == "" or v == "none" or v is None:
+            raise ValueError("apartamento_id é obrigatório")
+        return v
+
+    @field_validator("data_inicio", "data_fim", mode="before")
+    @classmethod
+    def empty_date_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+    @field_validator("definir_como_responsavel", mode="before")
+    @classmethod
+    def default_false_if_none(cls, v):
+        if v is None or v == "":
+            return False
+        return bool(v)
+
+    @field_validator("tipo_vinculo", mode="before")
+    @classmethod
+    def default_tipo_vinculo(cls, v):
+        if not v:
+            return "residente"
+        return v
+
