@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Building2, Users, PlusCircle, Trash2, Phone, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, Users, PlusCircle, Trash2, Phone, Mail, ShieldCheck, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ReadOnlyNotice } from "@/components/auth/admin-gate";
@@ -360,14 +360,24 @@ export default function EditApartamentoPage() {
         <div className="space-y-6">
           <Card className="border-border/60 shadow-sm">
             <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
-                  <Users className="h-5 w-5" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Moradores / Residentes</CardTitle>
+                    <CardDescription>Pessoas vinculadas a esta unidade</CardDescription>
+                  </div>
                 </div>
-                <div>
-                  <CardTitle className="text-base">Moradores / Residentes</CardTitle>
-                  <CardDescription>Pessoas que residem nesta unidade</CardDescription>
-                </div>
+                {isAdmin && (
+                  <Link href={`/moradores/novo?apartamento_id=${id}`}>
+                    <Button variant="ghost" size="sm" className="h-8 text-xs text-primary gap-1 hover:bg-primary/10">
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Novo</span>
+                    </Button>
+                  </Link>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -376,6 +386,7 @@ export default function EditApartamentoPage() {
                 {moradoresApto && moradoresApto.length > 0 ? (
                   moradoresApto.map((m) => {
                     const isResp = form.responsavel_id === m.id;
+                    const isProp = form.proprietario_id === m.id;
                     return (
                       <div
                         key={m.id}
@@ -386,6 +397,11 @@ export default function EditApartamentoPage() {
                         <div className="space-y-1">
                           <div className="font-semibold text-foreground flex items-center gap-1.5">
                             <span>{m.nome}</span>
+                            {isProp && (
+                              <Badge variant="outline" className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px] py-0 px-1.5 font-medium">
+                                Proprietário
+                              </Badge>
+                            )}
                             {isResp && (
                               <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-[10px] py-0 px-1.5 font-medium">
                                 Resp. Financeiro
@@ -397,6 +413,7 @@ export default function EditApartamentoPage() {
                               {tipoLabel[m.tipo] || m.tipo}
                             </Badge>
                             {m.telefone && <span>{m.telefone}</span>}
+                            {m.email && <span>{m.email}</span>}
                           </div>
                         </div>
                         {isAdmin && (
@@ -430,64 +447,90 @@ export default function EditApartamentoPage() {
                     );
                   })
                 ) : (
-                  <div className="p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground">
-                    Nenhum morador residente registrado neste apartamento.
+                  <div className="p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground space-y-1.5">
+                    <p>Nenhum morador residente registrado neste apartamento.</p>
                   </div>
                 )}
               </div>
 
-              {/* Form para vincular novo morador */}
+              {/* Form para vincular morador existente */}
               {isAdmin && (
-                <form onSubmit={handleLinkMorador} className="pt-3 border-t space-y-3">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Adicionar Morador Residente
-                  </Label>
-
-                  <div className="space-y-2">
-                    <Select
-                      value={selectedMoradorToLink}
-                      onValueChange={(v) => setSelectedMoradorToLink(v)}
-                    >
-                      <SelectTrigger className="text-xs h-9">
-                        <SelectValue placeholder="Selecione um morador..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {todosMoradores?.items?.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.nome} ({tipoLabel[m.tipo] || m.tipo})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center space-x-2 pt-1">
-                    <input
-                      type="checkbox"
-                      id="definirComoResp"
-                      checked={definirComoResp}
-                      onChange={(e) => setDefinirComoResp(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <Label htmlFor="definirComoResp" className="text-xs font-normal cursor-pointer">
-                      Definir como Responsável Administrativo / Financeiro
+                <div className="pt-3 border-t space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Vincular Morador
                     </Label>
+                    <Link
+                      href={`/moradores/novo?apartamento_id=${id}`}
+                      className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                    >
+                      <UserPlus className="h-3 w-3" />
+                      <span>Cadastrar Novo</span>
+                    </Link>
                   </div>
 
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    size="sm"
-                    disabled={!selectedMoradorToLink || vincularMut.isPending}
-                    className="w-full text-xs"
-                  >
-                    <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
-                    {vincularMut.isPending ? "Vinculando..." : "Adicionar à Unidade"}
-                  </Button>
-                </form>
+                  {todosMoradores?.items && todosMoradores.items.length > 0 ? (
+                    <form onSubmit={handleLinkMorador} className="space-y-3">
+                      <div className="space-y-2">
+                        <Select
+                          value={selectedMoradorToLink}
+                          onValueChange={(v) => setSelectedMoradorToLink(v)}
+                        >
+                          <SelectTrigger className="text-xs h-9">
+                            <SelectValue placeholder="Selecione um morador cadastrado..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {todosMoradores.items.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.nome} ({tipoLabel[m.tipo] || m.tipo}) {m.cpf ? `- ${m.cpf}` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center space-x-2 pt-1">
+                        <input
+                          type="checkbox"
+                          id="definirComoResp"
+                          checked={definirComoResp}
+                          onChange={(e) => setDefinirComoResp(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        />
+                        <Label htmlFor="definirComoResp" className="text-xs font-normal cursor-pointer">
+                          Definir como Responsável Administrativo / Financeiro
+                        </Label>
+                      </div>
+
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        disabled={!selectedMoradorToLink || vincularMut.isPending}
+                        className="w-full text-xs"
+                      >
+                        <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+                        {vincularMut.isPending ? "Vinculando..." : "Vincular a esta Unidade"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <div className="p-3.5 rounded-lg border border-dashed bg-muted/20 text-center space-y-2.5">
+                      <p className="text-xs text-muted-foreground">
+                        Não há moradores cadastrados no sistema para vincular.
+                      </p>
+                      <Link href={`/moradores/novo?apartamento_id=${id}`}>
+                        <Button size="sm" className="w-full text-xs gap-1.5">
+                          <UserPlus className="h-3.5 w-3.5" />
+                          Cadastrar Morador Agora
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
+
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCreateMorador } from "@/services/moradores.service";
 import { useApartamentos } from "@/services/apartamentos.service";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,10 @@ import { ArrowLeft, UserPlus, Building2 } from "lucide-react";
 import Link from "next/link";
 import { AdminGate, RestrictedPageNotice } from "@/components/auth/admin-gate";
 
-export default function NovoMoradorPage() {
+function NovoMoradorForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const aptoIdParam = searchParams.get("apartamento_id") || "";
   const createMut = useCreateMorador();
   const { data: aptosData } = useApartamentos({ page_size: 100 });
 
@@ -26,9 +28,15 @@ export default function NovoMoradorPage() {
     email: "",
     veiculo: "",
     tipo: "morador",
-    apartamento_id: "",
+    apartamento_id: aptoIdParam,
     definir_como_responsavel: false,
   });
+
+  useEffect(() => {
+    if (aptoIdParam) {
+      setForm((prev) => ({ ...prev, apartamento_id: aptoIdParam }));
+    }
+  }, [aptoIdParam]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,15 +48,20 @@ export default function NovoMoradorPage() {
         email: form.email || null,
         veiculo: form.veiculo || null,
         tipo: form.tipo as any,
-        apartamento_id: form.apartamento_id || null,
+        apartamento_id: form.apartamento_id && form.apartamento_id !== "none" ? form.apartamento_id : null,
         definir_como_responsavel: form.definir_como_responsavel,
       });
       toast.success("Cadastro realizado com sucesso!");
-      router.push("/moradores");
+      if (aptoIdParam && form.apartamento_id === aptoIdParam) {
+        router.push(`/apartamentos/${aptoIdParam}`);
+      } else {
+        router.push("/moradores");
+      }
     } catch {
       toast.error("Erro ao cadastrar morador/proprietário");
     }
   };
+
 
   return (
     <AdminGate fallback={<RestrictedPageNotice backHref="/moradores" backLabel="Voltar para Moradores" />}>
@@ -215,3 +228,12 @@ export default function NovoMoradorPage() {
     </AdminGate>
   );
 }
+
+export default function NovoMoradorPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Carregando formulário...</div>}>
+      <NovoMoradorForm />
+    </Suspense>
+  );
+}
+

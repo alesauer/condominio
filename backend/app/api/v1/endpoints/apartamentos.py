@@ -13,6 +13,7 @@ from app.schemas.common import PaginatedResponse
 from app.services import apartamento_service
 from app.utils.pagination import paginate
 from app.models.apartamento_morador import ApartamentoMorador
+from app.models.apartamento import Apartamento
 from app.models.morador import Morador
 
 router = APIRouter()
@@ -56,8 +57,27 @@ async def delete_apartamento(apartamento_id: str, db: AsyncSession = Depends(get
 @router.get("/{apartamento_id}/moradores", response_model=List[MoradorResponse], dependencies=[Depends(get_current_user)])
 async def list_moradores_apartamento(apartamento_id: str, db: AsyncSession = Depends(get_db)):
     aid = UUID(str(apartamento_id))
+
+    # 1. Fetch apto to get proprietario and responsavel
+    apto_res = await db.execute(
+        select(Apartamento)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Apartamento.proprietario).selectinload(Morador.apartamentos).selectinload(ApartamentoMorador.apartamento),
+            selectinload(Apartamento.proprietario).selectinload(Morador.apartamentos_proprietario),
+            selectinload(Apartamento.proprietario).selectinload(Morador.apartamentos_responsavel),
+            selectinload(Apartamento.responsavel).selectinload(Morador.apartamentos).selectinload(ApartamentoMorador.apartamento),
+            selectinload(Apartamento.responsavel).selectinload(Morador.apartamentos_proprietario),
+            selectinload(Apartamento.responsavel).selectinload(Morador.apartamentos_responsavel),
+        )
+        .where(Apartamento.id == aid)
+    )
+    apto = apto_res.scalar_one_or_none()
+
+    # 2. Fetch all moradores linked via ApartamentoMorador
     result = await db.execute(
         select(Morador)
+        .execution_options(populate_existing=True)
         .join(ApartamentoMorador, ApartamentoMorador.morador_id == Morador.id)
         .where(ApartamentoMorador.apartamento_id == aid)
         .options(
@@ -66,5 +86,17 @@ async def list_moradores_apartamento(apartamento_id: str, db: AsyncSession = Dep
             selectinload(Morador.apartamentos_responsavel),
         )
     )
-    return result.scalars().all()
+    moradores_list = list(result.scalars().all())
+    morador_ids = {m.id for m in moradores_list}
+
+    if apto:
+        if apto.proprietario and apto.proprietario.id not in morador_ids:
+            moradores_list.append(apto.proprietario)
+            morador_ids.add(apto.proprietario.id)
+        if apto.responsavel and apto.responsavel.id not in morador_ids:
+            moradores_list.append(apto.responsavel)
+            morador_ids.add(apto.responsavel.id)
+
+    return moradores_list
+
 
