@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useApartamento, useUpdateApartamento, useApartamentoMoradores } from "@/services/apartamentos.service";
-import { useMoradores, useVincularApartamento, useDesvincularApartamento } from "@/services/moradores.service";
+import { useMoradores } from "@/services/moradores.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Building2, Users, PlusCircle, Trash2, Phone, Mail, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Users, ShieldCheck, ArrowRight, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ReadOnlyNotice } from "@/components/auth/admin-gate";
@@ -29,12 +29,10 @@ export default function EditApartamentoPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { data: apto, isLoading, refetch: refetchApto } = useApartamento(id);
-  const { data: moradoresApto, refetch: refetchMoradoresApto } = useApartamentoMoradores(id);
+  const { data: moradoresApto } = useApartamentoMoradores(id);
   const { data: todosMoradores } = useMoradores({ page_size: 200 });
 
   const updateMut = useUpdateApartamento();
-  const vincularMut = useVincularApartamento();
-  const desvincularMut = useDesvincularApartamento();
 
   const [form, setForm] = useState({
     numero: "",
@@ -47,9 +45,6 @@ export default function EditApartamentoPage() {
     proprietario_id: "",
     responsavel_id: "",
   });
-
-  const [selectedMoradorToLink, setSelectedMoradorToLink] = useState("");
-  const [definirComoResp, setDefinirComoResp] = useState(false);
 
   useEffect(() => {
     if (apto) {
@@ -91,64 +86,6 @@ export default function EditApartamentoPage() {
     }
   };
 
-  const handleSetResponsavelQuick = async (moradorId: string, nome: string) => {
-    try {
-      await updateMut.mutateAsync({
-        id,
-        data: {
-          responsavel_id: moradorId,
-        },
-      });
-      setForm((prev) => ({ ...prev, responsavel_id: moradorId }));
-      await refetchApto();
-      toast.success(`${nome} agora é o responsável administrativo pelo apartamento!`);
-    } catch {
-      toast.error("Erro ao definir responsável administrativo");
-    }
-  };
-
-  const handleLinkMorador = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMoradorToLink) return;
-
-    try {
-      await vincularMut.mutateAsync({
-        moradorId: selectedMoradorToLink,
-        data: {
-          apartamento_id: id,
-          tipo_vinculo: "residente",
-          definir_como_responsavel: definirComoResp,
-        },
-      });
-      if (definirComoResp) {
-        setForm((prev) => ({ ...prev, responsavel_id: selectedMoradorToLink }));
-        await refetchApto();
-      }
-      await refetchMoradoresApto();
-      setSelectedMoradorToLink("");
-      setDefinirComoResp(false);
-      toast.success("Morador vinculado com sucesso!");
-    } catch {
-      toast.error("Erro ao vincular morador");
-    }
-  };
-
-  const handleUnlinkMorador = async (moradorId: string, nome: string) => {
-    if (!confirm(`Deseja desvincular ${nome} deste apartamento?`)) return;
-
-    try {
-      await desvincularMut.mutateAsync({
-        moradorId,
-        apartamentoId: id,
-      });
-      await refetchMoradoresApto();
-      await refetchApto();
-      toast.success(`${nome} desvinculado com sucesso!`);
-    } catch {
-      toast.error("Erro ao desvincular morador");
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="max-w-4xl space-y-4">
@@ -186,7 +123,7 @@ export default function EditApartamentoPage() {
             Apartamento {apto.numero} {apto.bloco ? `(Bloco ${apto.bloco})` : ""}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {isAdmin ? "Edição de dados da unidade, proprietário e lista de moradores residentes" : "Visualização de dados da unidade, proprietário e lista de moradores residentes"}
+            {isAdmin ? "Edição de dados da unidade e proprietário" : "Visualização de dados da unidade e proprietário"}
           </p>
         </div>
       </div>
@@ -356,28 +293,18 @@ export default function EditApartamentoPage() {
           </Card>
         </div>
 
-        {/* Moradores Residentes da Unidade */}
+        {/* Moradores Residentes da Unidade (Apenas Visualização) */}
         <div className="space-y-6">
           <Card className="border-border/60 shadow-sm">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
-                    <Users className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Moradores / Residentes</CardTitle>
-                    <CardDescription>Pessoas vinculadas a esta unidade</CardDescription>
-                  </div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                  <Users className="h-5 w-5" />
                 </div>
-                {isAdmin && (
-                  <Link href={`/moradores/novo?apartamento_id=${id}`}>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs text-primary gap-1 hover:bg-primary/10">
-                      <UserPlus className="h-3.5 w-3.5" />
-                      <span>Novo</span>
-                    </Button>
-                  </Link>
-                )}
+                <div>
+                  <CardTitle className="text-base">Moradores / Residentes</CardTitle>
+                  <CardDescription>Pessoas vinculadas a esta unidade</CardDescription>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -396,7 +323,13 @@ export default function EditApartamentoPage() {
                       >
                         <div className="space-y-1">
                           <div className="font-semibold text-foreground flex items-center gap-1.5">
-                            <span>{m.nome}</span>
+                            <Link
+                              href={`/moradores/${m.id}`}
+                              className="hover:underline flex items-center gap-1 text-foreground"
+                            >
+                              <span>{m.nome}</span>
+                              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                            </Link>
                             {isProp && (
                               <Badge variant="outline" className="bg-blue-500/15 text-blue-600 border-blue-500/30 text-[10px] py-0 px-1.5 font-medium">
                                 Proprietário
@@ -416,123 +349,35 @@ export default function EditApartamentoPage() {
                             {m.email && <span>{m.email}</span>}
                           </div>
                         </div>
-                        {isAdmin && (
-                          <div className="flex items-center gap-1">
-                            {!isResp && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSetResponsavelQuick(m.id, m.nome)}
-                                title="Tornar este morador o responsável administrativo"
-                                className="h-8 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15"
-                              >
-                                Tornar Resp.
-                              </Button>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleUnlinkMorador(m.id, m.nome)}
-                              title="Desvincular deste apartamento"
-                              disabled={desvincularMut.isPending}
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     );
                   })
                 ) : (
-                  <div className="p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground space-y-1.5">
-                    <p>Nenhum morador residente registrado neste apartamento.</p>
+                  <div className="p-4 rounded-lg border border-dashed text-center text-xs text-muted-foreground space-y-1">
+                    <p>Nenhum morador residente registrado nesta unidade.</p>
                   </div>
                 )}
               </div>
 
-              {/* Form para vincular morador existente */}
-              {isAdmin && (
-                <div className="pt-3 border-t space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Vincular Morador
-                    </Label>
-                    <Link
-                      href={`/moradores/novo?apartamento_id=${id}`}
-                      className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
-                    >
-                      <UserPlus className="h-3 w-3" />
-                      <span>Cadastrar Novo</span>
-                    </Link>
-                  </div>
-
-                  {todosMoradores?.items && todosMoradores.items.length > 0 ? (
-                    <form onSubmit={handleLinkMorador} className="space-y-3">
-                      <div className="space-y-2">
-                        <Select
-                          value={selectedMoradorToLink}
-                          onValueChange={(v) => setSelectedMoradorToLink(v)}
-                        >
-                          <SelectTrigger className="text-xs h-9">
-                            <SelectValue placeholder="Selecione um morador cadastrado..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {todosMoradores.items.map((m) => (
-                              <SelectItem key={m.id} value={m.id}>
-                                {m.nome} ({tipoLabel[m.tipo] || m.tipo}) {m.cpf ? `- ${m.cpf}` : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex items-center space-x-2 pt-1">
-                        <input
-                          type="checkbox"
-                          id="definirComoResp"
-                          checked={definirComoResp}
-                          onChange={(e) => setDefinirComoResp(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                        />
-                        <Label htmlFor="definirComoResp" className="text-xs font-normal cursor-pointer">
-                          Definir como Responsável Administrativo / Financeiro
-                        </Label>
-                      </div>
-
-                      <Button
-                        type="submit"
-                        variant="outline"
-                        size="sm"
-                        disabled={!selectedMoradorToLink || vincularMut.isPending}
-                        className="w-full text-xs"
-                      >
-                        <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
-                        {vincularMut.isPending ? "Vinculando..." : "Vincular a esta Unidade"}
-                      </Button>
-                    </form>
-                  ) : (
-                    <div className="p-3.5 rounded-lg border border-dashed bg-muted/20 text-center space-y-2.5">
-                      <p className="text-xs text-muted-foreground">
-                        Não há moradores cadastrados no sistema para vincular.
-                      </p>
-                      <Link href={`/moradores/novo?apartamento_id=${id}`}>
-                        <Button size="sm" className="w-full text-xs gap-1.5">
-                          <UserPlus className="h-3.5 w-3.5" />
-                          Cadastrar Morador Agora
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
+              {/* Informação e Redirecionamento para o Módulo de Moradores */}
+              <div className="pt-3 border-t space-y-2">
+                <div className="p-3 rounded-lg bg-muted/40 border text-xs text-muted-foreground space-y-2">
+                  <p>
+                    A vinculação, cadastro e gestão de moradores é feita diretamente no módulo de <strong>Moradores</strong>.
+                  </p>
+                  <Link href="/moradores">
+                    <Button variant="outline" size="sm" className="w-full text-xs gap-1.5 mt-1">
+                      <span>Acessar Módulo de Moradores</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
-
         </div>
       </div>
     </div>
   );
 }
+
