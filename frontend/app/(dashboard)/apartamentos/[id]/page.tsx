@@ -42,8 +42,8 @@ export default function EditApartamentoPage() {
     fracao_ideal: "",
     metragem: "",
     vaga_demarcada: "",
-    proprietario_id: "",
-    responsavel_id: "",
+    proprietario_id: "none",
+    responsavel_id: "none",
   });
 
   useEffect(() => {
@@ -56,8 +56,8 @@ export default function EditApartamentoPage() {
         fracao_ideal: apto.fracao_ideal?.toString() || "",
         metragem: apto.metragem?.toString() || "",
         vaga_demarcada: apto.vaga_demarcada || "",
-        proprietario_id: apto.proprietario_id || "",
-        responsavel_id: apto.responsavel_id || "",
+        proprietario_id: apto.proprietario_id || "none",
+        responsavel_id: apto.responsavel_id || "none",
       });
     }
   }, [apto]);
