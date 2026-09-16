@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useApartamento, useUpdateApartamento, useApartamentoMoradores } from "@/services/apartamentos.service";
-import { useMoradores } from "@/services/moradores.service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,7 +29,6 @@ export default function EditApartamentoPage() {
   const router = useRouter();
   const { data: apto, isLoading, refetch: refetchApto } = useApartamento(id);
   const { data: moradoresApto } = useApartamentoMoradores(id);
-  const { data: todosMoradores } = useMoradores({ page_size: 200 });
 
   const updateMut = useUpdateApartamento();
 
@@ -42,8 +40,6 @@ export default function EditApartamentoPage() {
     fracao_ideal: "",
     metragem: "",
     vaga_demarcada: "",
-    proprietario_id: "none",
-    responsavel_id: "none",
   });
 
   useEffect(() => {
@@ -56,8 +52,6 @@ export default function EditApartamentoPage() {
         fracao_ideal: apto.fracao_ideal?.toString() || "",
         metragem: apto.metragem?.toString() || "",
         vaga_demarcada: apto.vaga_demarcada || "",
-        proprietario_id: apto.proprietario_id || "none",
-        responsavel_id: apto.responsavel_id || "none",
       });
     }
   }, [apto]);
@@ -75,8 +69,6 @@ export default function EditApartamentoPage() {
           fracao_ideal: form.fracao_ideal ? Number(form.fracao_ideal) : null,
           metragem: form.metragem ? Number(form.metragem) : null,
           vaga_demarcada: form.vaga_demarcada || null,
-          proprietario_id: form.proprietario_id && form.proprietario_id !== "none" ? form.proprietario_id : null,
-          responsavel_id: form.responsavel_id && form.responsavel_id !== "none" ? form.responsavel_id : null,
         },
       });
       await refetchApto();
@@ -123,7 +115,7 @@ export default function EditApartamentoPage() {
             Apartamento {apto.numero} {apto.bloco ? `(Bloco ${apto.bloco})` : ""}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {isAdmin ? "Edição de dados da unidade e proprietário" : "Visualização de dados da unidade e proprietário"}
+            {isAdmin ? "Edição de características da unidade física" : "Visualização de características da unidade física"}
           </p>
         </div>
       </div>
@@ -139,7 +131,7 @@ export default function EditApartamentoPage() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">Dados do Imóvel</CardTitle>
-                  <CardDescription>Características e proprietário responsável</CardDescription>
+                  <CardDescription>Características físicas e cadastrais da unidade</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -194,50 +186,8 @@ export default function EditApartamentoPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="proprietario">Proprietário</Label>
-                    <Select
-                      value={form.proprietario_id}
-                      onValueChange={(v) => setForm({ ...form, proprietario_id: v })}
-                    >
-                      <SelectTrigger id="proprietario">
-                        <SelectValue placeholder="Selecione o proprietário..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sem proprietário vinculado</SelectItem>
-                        {todosMoradores?.items.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.nome} ({m.tipo.toUpperCase()}) {m.cpf ? `- CPF: ${m.cpf}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="responsavel">Responsável Administrativo / Financeiro</Label>
-                    <Select
-                      value={form.responsavel_id}
-                      onValueChange={(v) => setForm({ ...form, responsavel_id: v })}
-                    >
-                      <SelectTrigger id="responsavel">
-                        <SelectValue placeholder="Selecione o responsável..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Não definido</SelectItem>
-                        {todosMoradores?.items.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.nome} ({m.tipo.toUpperCase()})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 {/* Dica de Faturamento Legal para Imóvel Alugado */}
-                {(form.status === "alugado" || (form.responsavel_id && form.proprietario_id && form.responsavel_id !== form.proprietario_id)) && (
+                {form.status === "alugado" && (
                   <div className="p-3 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/30 text-xs space-y-1">
                     <div className="font-semibold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
                       <ShieldCheck className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
@@ -312,8 +262,8 @@ export default function EditApartamentoPage() {
               <div className="space-y-2">
                 {moradoresApto && moradoresApto.length > 0 ? (
                   moradoresApto.map((m) => {
-                    const isResp = form.responsavel_id === m.id;
-                    const isProp = form.proprietario_id === m.id;
+                    const isResp = apto?.responsavel_id === m.id;
+                    const isProp = apto?.proprietario_id === m.id || m.tipo === "proprietario";
                     return (
                       <div
                         key={m.id}
@@ -380,4 +330,5 @@ export default function EditApartamentoPage() {
     </div>
   );
 }
+
 
