@@ -45,7 +45,7 @@ async def delete_morador(morador_id: str, db: AsyncSession = Depends(get_db)):
     await morador_service.delete_morador(db, morador_id)
 
 
-@router.post("/{morador_id}/vincular-apartamento", dependencies=[Depends(admin_required)])
+@router.post("/{morador_id}/vincular-apartamento", response_model=MoradorResponse, dependencies=[Depends(admin_required)])
 async def vincular_apartamento(morador_id: str, data: VincularApartamento, db: AsyncSession = Depends(get_db)):
     return await morador_service.vincular_apartamento(db, morador_id, data.model_dump())
 

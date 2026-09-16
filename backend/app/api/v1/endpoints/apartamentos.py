@@ -1,3 +1,4 @@
+from typing import List
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,10 +8,12 @@ from app.core.database import get_db
 from app.core.permissions import admin_required
 from app.api.deps import get_current_user
 from app.schemas.apartamento import ApartamentoCreate, ApartamentoUpdate, ApartamentoResponse, ApartamentoListResponse
+from app.schemas.morador import MoradorResponse
 from app.schemas.common import PaginatedResponse
 from app.services import apartamento_service
 from app.utils.pagination import paginate
 from app.models.apartamento_morador import ApartamentoMorador
+from app.models.morador import Morador
 
 router = APIRouter()
 
@@ -50,12 +53,18 @@ async def delete_apartamento(apartamento_id: str, db: AsyncSession = Depends(get
     await apartamento_service.delete_apartamento(db, apartamento_id)
 
 
-@router.get("/{apartamento_id}/moradores", dependencies=[Depends(get_current_user)])
+@router.get("/{apartamento_id}/moradores", response_model=List[MoradorResponse], dependencies=[Depends(get_current_user)])
 async def list_moradores_apartamento(apartamento_id: str, db: AsyncSession = Depends(get_db)):
+    aid = UUID(str(apartamento_id))
     result = await db.execute(
-        select(ApartamentoMorador)
-        .where(ApartamentoMorador.apartamento_id == apartamento_id)
-        .options(selectinload(ApartamentoMorador.morador))
+        select(Morador)
+        .join(ApartamentoMorador, ApartamentoMorador.morador_id == Morador.id)
+        .where(ApartamentoMorador.apartamento_id == aid)
+        .options(
+            selectinload(Morador.apartamentos).selectinload(ApartamentoMorador.apartamento),
+            selectinload(Morador.apartamentos_proprietario),
+            selectinload(Morador.apartamentos_responsavel),
+        )
     )
-    vinculos = result.scalars().all()
-    return [v.morador for v in vinculos]
+    return result.scalars().all()
+

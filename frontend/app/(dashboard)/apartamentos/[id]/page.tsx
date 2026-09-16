@@ -142,6 +142,7 @@ export default function EditApartamentoPage() {
         apartamentoId: id,
       });
       await refetchMoradoresApto();
+      await refetchApto();
       toast.success(`${nome} desvinculado com sucesso!`);
     } catch {
       toast.error("Erro ao desvincular morador");

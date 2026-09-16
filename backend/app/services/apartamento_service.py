@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
@@ -30,14 +31,16 @@ async def create_apartamento(db: AsyncSession, data: dict, usuario=None) -> Apar
     return apto
 
 
-async def get_apartamento(db: AsyncSession, apartamento_id: str) -> Apartamento:
+async def get_apartamento(db: AsyncSession, apartamento_id: str | UUID) -> Apartamento:
+    aid = UUID(str(apartamento_id))
     result = await db.execute(
         select(Apartamento)
+        .execution_options(populate_existing=True)
         .options(
             selectinload(Apartamento.proprietario),
             selectinload(Apartamento.responsavel),
         )
-        .where(Apartamento.id == apartamento_id)
+        .where(Apartamento.id == aid)
     )
     apto = result.scalar_one_or_none()
     if not apto:
@@ -53,9 +56,13 @@ async def list_apartamentos(
     tipo: str = None,
     status: str = None,
 ):
-    query = select(Apartamento).options(
-        selectinload(Apartamento.proprietario),
-        selectinload(Apartamento.responsavel),
+    query = (
+        select(Apartamento)
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(Apartamento.proprietario),
+            selectinload(Apartamento.responsavel),
+        )
     )
     if search:
         query = query.where(

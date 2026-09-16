@@ -172,10 +172,12 @@ class TestProprietarioService:
 
 class TestMoradorService:
     async def test_create(self, mock_db):
+        m = Morador(id=uuid.uuid4(), nome="Maria", tipo=TipoMorador.morador)
+        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=m)
         data = {"nome": "Maria", "tipo": "morador"}
         morador = await morador_service.create_morador(mock_db, data)
         mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.commit.assert_awaited_once()
 
     async def test_get_found(self, mock_db):
         m = Morador(id=uuid.uuid4(), nome="Maria", tipo=TipoMorador.morador)
@@ -212,18 +214,27 @@ class TestMoradorService:
         assert query is not None
 
     async def test_vincular_apartamento(self, mock_db):
-        from app.models.apartamento_morador import ApartamentoMorador
-        data = {"apartamento_id": uuid.uuid4(), "data_inicio": date(2024, 1, 1)}
-        vinculo = await morador_service.vincular_apartamento(mock_db, str(uuid.uuid4()), data)
+        m = Morador(id=uuid.uuid4(), nome="Maria", tipo=TipoMorador.morador)
+        apto = Apartamento(id=uuid.uuid4(), numero="101")
+        mock_db.execute.side_effect = [
+            make_mock_result(scalar_one_or_none_return=apto),  # apto check
+            make_mock_result(scalar_one_or_none_return=None),  # am check
+            make_mock_result(scalar_one_or_none_return=m),     # get_morador
+        ]
+        data = {"apartamento_id": apto.id, "data_inicio": date(2024, 1, 1)}
+        res = await morador_service.vincular_apartamento(mock_db, str(m.id), data)
         mock_db.add.assert_called_once()
-        assert isinstance(vinculo, ApartamentoMorador)
+        assert res.id == m.id
 
     async def test_desvincular_apartamento(self, mock_db):
         vinculo = MagicMock()
-        mock_db.execute.return_value = make_mock_result(scalar_one_or_none_return=vinculo)
-
+        mock_db.execute.side_effect = [
+            make_mock_result(scalar_one_or_none_return=None),  # apto check
+            make_mock_result(scalars_all_return=[vinculo]),    # am check
+        ]
         await morador_service.desvincular_apartamento(mock_db, str(uuid.uuid4()), str(uuid.uuid4()))
         mock_db.delete.assert_called_once_with(vinculo)
+
 
 
 # ── DespesaService ─────────────────────────────────────────────────
